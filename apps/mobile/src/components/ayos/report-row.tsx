@@ -12,6 +12,7 @@ type ReportRowProps = {
   /** Rendered under the meta line. */
   footer?: ReactNode;
   thumbSize?: number;
+  showPhotoIcon?: boolean;
   onPress?: () => void;
 };
 
@@ -23,6 +24,7 @@ export function ReportRow({
   trailing,
   footer,
   thumbSize = 52,
+  showPhotoIcon = true,
   onPress,
 }: ReportRowProps) {
   return (
@@ -31,7 +33,7 @@ export function ReportRow({
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
-      <PhotoThumb tone={photoTone} size={thumbSize} />
+      <PhotoThumb tone={photoTone} size={thumbSize} showIcon={showPhotoIcon} />
       <View style={styles.body}>
         <Text style={styles.title} numberOfLines={2}>
           {title}
