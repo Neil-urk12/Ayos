@@ -1,433 +1,254 @@
-import { StatusBar } from 'expo-status-bar';
-import { SymbolView } from 'expo-symbols';
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
+import { useState } from 'react';
 import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-export default function IndexScreen() {
+import { Button } from '@/components/ayos/button';
+import { Icon, type IconName } from '@/components/ayos/icon';
+import { colors, fonts, radius, type } from '@/constants/design';
+
+type Language = 'en' | 'ceb';
+
+const features: { icon: IconName; label: string }[] = [
+  { icon: 'camera', label: 'Snap a photo' },
+  { icon: 'pin', label: 'Drop a pin' },
+  { icon: 'check-circle', label: 'Track the fix' },
+];
+
+export default function SignInScreen() {
+  const [language, setLanguage] = useState<Language>('en');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  const signIn = () => router.replace('/map');
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="dark" />
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* Header Row: Logo + Language Switcher */}
-        <View style={styles.header}>
-          <View style={styles.brandGroup}>
-            <View style={styles.logoBadge}>
-              <SymbolView
-                name="wrench.fill"
-                size={22}
-                tintColor="#FFFFFF"
-                fallback={<WrenchFallbackIcon />}
-              />
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.header}>
+            <View style={styles.brand}>
+              <View style={styles.logo}>
+                <Icon name="wrench" size={20} color={colors.onPrimary} />
+              </View>
+              <Text style={styles.brandName}>AYOS</Text>
             </View>
-            <Text style={styles.brandName}>AYOS</Text>
+
+            <View style={styles.languageToggle} accessibilityRole="radiogroup">
+              {(['en', 'ceb'] as const).map((code) => {
+                const active = language === code;
+                return (
+                  <Pressable
+                    key={code}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: active }}
+                    accessibilityLabel={code === 'en' ? 'English' : 'Cebuano'}
+                    onPress={() => setLanguage(code)}
+                    style={[styles.languageOption, active && styles.languageOptionActive]}
+                  >
+                    <Text style={[styles.languageText, active && styles.languageTextActive]}>
+                      {code.toUpperCase()}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
 
-          <View style={styles.langToggle}>
-            <View style={[styles.langPill, styles.langPillActive]}>
-              <Text style={[styles.langText, styles.langTextActive]}>EN</Text>
-            </View>
-            <View style={styles.langPill}>
-              <Text style={styles.langText}>CEB</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Hero Copy */}
-        <Text style={styles.headline}>
-          {'Report broken roads,\nclogged drains and\ndead streetlights.'}
-        </Text>
-        <Text style={styles.subheadline}>
-          Send a photo and a pin. Your LGU groups matching reports and tells you
-          when it's fixed.
-        </Text>
-
-        {/* 3-Step Feature Cards */}
-        <View style={styles.cardsRow}>
-          <View style={styles.featureCard}>
-            <View style={styles.iconBox}>
-              <SymbolView
-                name="camera"
-                size={22}
-                tintColor="#1856D6"
-                fallback={<CameraFallbackIcon />}
-              />
-            </View>
-            <Text style={styles.cardLabel}>{'Snap a\nphoto'}</Text>
-          </View>
-
-          <View style={styles.featureCard}>
-            <View style={styles.iconBox}>
-              <SymbolView
-                name="mappin"
-                size={22}
-                tintColor="#1856D6"
-                fallback={<PinFallbackIcon />}
-              />
-            </View>
-            <Text style={styles.cardLabel}>Drop a pin</Text>
-          </View>
-
-          <View style={styles.featureCard}>
-            <View style={styles.iconBox}>
-              <SymbolView
-                name="checkmark.circle"
-                size={22}
-                tintColor="#1856D6"
-                fallback={<CheckCircleFallbackIcon />}
-              />
-            </View>
-            <Text style={styles.cardLabel}>Track the fix</Text>
-          </View>
-        </View>
-
-        {/* Static Auth Form */}
-        <View style={styles.formSection}>
-          <Text style={styles.inputLabel}>Email</Text>
-          <View style={styles.inputBox}>
-            <Text style={styles.placeholderText}>you@example.com</Text>
-          </View>
-
-          <Text style={[styles.inputLabel, styles.passwordLabelSpacing]}>
-            Password
+          <Text style={styles.headline} accessibilityRole="header">
+            Report broken roads, clogged drains and dead streetlights.
           </Text>
-          <View style={styles.inputBox}>
-            <Text style={styles.placeholderText}>••••••••</Text>
-          </View>
-
-          <Link href="/map" asChild>
-            <View style={styles.signInButton}>
-              <Text style={styles.signInButtonText}>Sign in</Text>
-            </View>
-          </Link>
-
-          <View style={styles.linksRow}>
-            <Link href="/create-account">
-              <Text style={styles.linkText}>Create an account</Text>
-            </Link>
-            <Text style={styles.linkText}>Forgot password?</Text>
-          </View>
-        </View>
-
-        {/* Footer Legal Note */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Your photos and location are used only to process your report, under
-            the Data Privacy Act of 2012 (RA 10173).{' '}
-            <Text style={styles.footerLink}>Privacy notice</Text>
+          <Text style={styles.lede}>
+            Send a photo and a pin. Your LGU groups matching reports and tells you when it&apos;s
+            fixed.
           </Text>
-        </View>
-      </ScrollView>
+
+          <View style={styles.features}>
+            {features.map((feature) => (
+              <View key={feature.label} style={styles.featureCard}>
+                <Icon name={feature.icon} size={22} color={colors.primary} />
+                <Text style={styles.featureLabel}>{feature.label}</Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.form}>
+            <Text style={styles.label} nativeID="email-label">
+              Email
+            </Text>
+            <TextInput
+              accessibilityLabelledBy="email-label"
+              value={email}
+              onChangeText={setEmail}
+              placeholder="you@example.com"
+              placeholderTextColor={colors.placeholder}
+              autoCapitalize="none"
+              autoComplete="email"
+              keyboardType="email-address"
+              textContentType="emailAddress"
+              returnKeyType="next"
+              style={styles.input}
+            />
+
+            <Text style={[styles.label, styles.labelSpaced]} nativeID="password-label">
+              Password
+            </Text>
+            <TextInput
+              accessibilityLabelledBy="password-label"
+              value={password}
+              onChangeText={setPassword}
+              placeholder="••••••••"
+              placeholderTextColor={colors.placeholder}
+              secureTextEntry
+              autoComplete="current-password"
+              textContentType="password"
+              returnKeyType="go"
+              onSubmitEditing={signIn}
+              style={styles.input}
+            />
+
+            <Button label="Sign in" onPress={signIn} style={styles.signIn} />
+
+            <View style={styles.links}>
+              <Link href="/create-account" style={styles.link}>
+                Create an account
+              </Link>
+              <Text style={styles.link} accessibilityRole="link">
+                Forgot password?
+              </Text>
+            </View>
+          </View>
+
+          <Text style={styles.privacy}>
+            Your photos and location are used only to process your report, under the Data Privacy
+            Act of 2012 (RA 10173).{'\n'}
+            <Text style={styles.privacyLink} accessibilityRole="link">
+              Privacy notice
+            </Text>
+          </Text>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-/* --- Cross-platform Fallback Icons (Android / Web) --- */
-
-function WrenchFallbackIcon() {
-  return (
-    <View style={{ width: 22, height: 22, alignItems: 'center', justifyContent: 'center' }}>
-      <View
-        style={{
-          width: 14,
-          height: 3.5,
-          backgroundColor: '#FFFFFF',
-          borderRadius: 2,
-          transform: [{ rotate: '-45deg' }],
-        }}
-      />
-      <View
-        style={{
-          position: 'absolute',
-          top: 3,
-          right: 3,
-          width: 8,
-          height: 8,
-          borderRadius: 4,
-          borderWidth: 2.2,
-          borderColor: '#FFFFFF',
-          backgroundColor: '#1856D6',
-        }}
-      />
-    </View>
-  );
-}
-
-function CameraFallbackIcon() {
-  return (
-    <View style={{ width: 22, height: 18, justifyContent: 'flex-end' }}>
-      <View
-        style={{
-          alignSelf: 'center',
-          width: 8,
-          height: 3,
-          borderTopLeftRadius: 2,
-          borderTopRightRadius: 2,
-          borderWidth: 1.8,
-          borderBottomWidth: 0,
-          borderColor: '#1856D6',
-        }}
-      />
-      <View
-        style={{
-          width: 22,
-          height: 15,
-          borderRadius: 3.5,
-          borderWidth: 1.8,
-          borderColor: '#1856D6',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <View
-          style={{
-            width: 7,
-            height: 7,
-            borderRadius: 3.5,
-            borderWidth: 1.8,
-            borderColor: '#1856D6',
-          }}
-        />
-      </View>
-    </View>
-  );
-}
-
-function PinFallbackIcon() {
-  return (
-    <View style={{ width: 20, height: 22, alignItems: 'center', justifyContent: 'center' }}>
-      <View
-        style={{
-          width: 16,
-          height: 16,
-          borderTopLeftRadius: 8,
-          borderTopRightRadius: 8,
-          borderBottomLeftRadius: 8,
-          borderWidth: 1.8,
-          borderColor: '#1856D6',
-          transform: [{ rotate: '45deg' }],
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <View
-          style={{
-            width: 5,
-            height: 5,
-            borderRadius: 2.5,
-            borderWidth: 1.6,
-            borderColor: '#1856D6',
-          }}
-        />
-      </View>
-    </View>
-  );
-}
-
-function CheckCircleFallbackIcon() {
-  return (
-    <View
-      style={{
-        width: 20,
-        height: 20,
-        borderRadius: 10,
-        borderWidth: 1.8,
-        borderColor: '#1856D6',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <View
-        style={{
-          width: 9,
-          height: 5,
-          borderLeftWidth: 1.8,
-          borderBottomWidth: 1.8,
-          borderColor: '#1856D6',
-          transform: [{ rotate: '-45deg' }, { translateY: -1 }],
-        }}
-      />
-    </View>
-  );
-}
-
-/* --- Styles --- */
-
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#F7F9FC',
-  },
-  scrollContent: {
+  safeArea: { flex: 1, backgroundColor: colors.background },
+  flex: { flex: 1 },
+  content: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 28,
+    paddingTop: 28,
+    paddingBottom: 24,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 28,
+    marginBottom: 32,
   },
-  brandGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  logoBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#1856D6',
+  brand: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  logo: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   brandName: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#111827',
-    letterSpacing: 0.6,
+    fontFamily: fonts.display,
+    fontSize: 24,
+    letterSpacing: 0.5,
+    color: colors.text,
   },
-  langToggle: {
+  languageToggle: {
     flexDirection: 'row',
-    backgroundColor: '#E5E8EE',
-    borderRadius: 22,
+    backgroundColor: '#E6E9EE',
+    borderRadius: radius.pill,
     padding: 3,
   },
-  langPill: {
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 18,
+  languageOption: {
+    minWidth: 42,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    alignItems: 'center',
   },
-  langPillActive: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
+  languageOptionActive: {
+    backgroundColor: colors.surface,
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 1,
   },
-  langText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#5C6470',
-  },
-  langTextActive: {
-    color: '#111827',
-  },
-  headline: {
-    fontSize: 31,
-    fontWeight: '800',
-    color: '#141A24',
-    lineHeight: 37,
-    letterSpacing: -0.6,
-    marginBottom: 14,
-  },
-  subheadline: {
-    fontSize: 16,
-    fontWeight: '400',
-    color: '#525A66',
-    lineHeight: 23,
+  languageText: { fontFamily: fonts.semibold, fontSize: 13, color: colors.textMuted },
+  languageTextActive: { color: colors.text },
+  headline: { ...type.hero, marginBottom: 14 },
+  lede: {
+    fontFamily: fonts.regular,
+    fontSize: 16.5,
+    lineHeight: 24,
+    color: colors.textSecondary,
     marginBottom: 28,
   },
-  cardsRow: {
-    flexDirection: 'row',
-    gap: 11,
-    marginBottom: 34,
-  },
+  features: { flexDirection: 'row', gap: 10, marginBottom: 40 },
   featureCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
+    minHeight: 86,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: '#E4E8EF',
-    paddingVertical: 14,
+    borderColor: colors.border,
     paddingHorizontal: 12,
-    minHeight: 96,
-    justifyContent: 'space-between',
+    paddingTop: 12,
+    paddingBottom: 14,
+    gap: 10,
   },
-  iconBox: {
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-    marginBottom: 10,
-  },
-  cardLabel: {
-    fontSize: 13.5,
-    fontWeight: '700',
-    color: '#141A24',
-    lineHeight: 18,
-  },
-  formSection: {
-    marginBottom: 28,
-  },
-  inputLabel: {
-    fontSize: 14.5,
-    fontWeight: '700',
-    color: '#141A24',
-    marginBottom: 8,
-  },
-  passwordLabelSpacing: {
-    marginTop: 16,
-  },
-  inputBox: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#D4DAE3',
-    borderRadius: 12,
+  featureLabel: { fontFamily: fonts.semibold, fontSize: 14, lineHeight: 18, color: colors.text },
+  form: { marginBottom: 32 },
+  label: { ...type.label, fontSize: 15, marginBottom: 8 },
+  labelSpaced: { marginTop: 18 },
+  input: {
     height: 50,
-    paddingHorizontal: 16,
-    justifyContent: 'center',
-  },
-  placeholderText: {
-    fontSize: 15.5,
-    color: '#71767E',
-  },
-  signInButton: {
-    backgroundColor: '#1856D6',
-    borderRadius: 12,
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 22,
-  },
-  signInButtonText: {
-    color: '#FFFFFF',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
+    paddingHorizontal: 15,
+    fontFamily: fonts.regular,
     fontSize: 16,
-    fontWeight: '700',
+    color: colors.text,
   },
-  linksRow: {
+  signIn: { marginTop: 14 },
+  links: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
     marginTop: 18,
   },
-  linkText: {
-    color: '#1856D6',
-    fontSize: 14.5,
-    fontWeight: '500',
+  link: {
+    fontFamily: fonts.medium,
+    fontSize: 15,
+    color: colors.primary,
     textDecorationLine: 'underline',
   },
-  footer: {
-    marginTop: 'auto',
-    paddingTop: 8,
-  },
-  footerText: {
-    fontSize: 12.5,
-    color: '#5C6470',
-    lineHeight: 18,
-  },
-  footerLink: {
-    color: '#1856D6',
-    textDecorationLine: 'underline',
-  },
+  privacy: { ...type.small, fontSize: 13, color: colors.textSecondary, marginTop: 'auto' },
+  privacyLink: { color: colors.primary, textDecorationLine: 'underline' },
 });
