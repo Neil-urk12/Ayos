@@ -1,4 +1,6 @@
-import React from 'react';
+import { StatusBar } from 'expo-status-bar';
+import { SymbolView } from 'expo-symbols';
+import { Link } from 'expo-router';
 import {
   ScrollView,
   StyleSheet,
@@ -6,8 +8,6 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
-import { SymbolView } from 'expo-symbols';
 
 export default function IndexScreen() {
   return (
@@ -103,12 +103,16 @@ export default function IndexScreen() {
             <Text style={styles.placeholderText}>••••••••</Text>
           </View>
 
-          <View style={styles.signInButton}>
-            <Text style={styles.signInButtonText}>Sign in</Text>
-          </View>
+          <Link href="/map" asChild>
+            <View style={styles.signInButton}>
+              <Text style={styles.signInButtonText}>Sign in</Text>
+            </View>
+          </Link>
 
           <View style={styles.linksRow}>
-            <Text style={styles.linkText}>Create an account</Text>
+            <Link href="/create-account">
+              <Text style={styles.linkText}>Create an account</Text>
+            </Link>
             <Text style={styles.linkText}>Forgot password?</Text>
           </View>
         </View>
