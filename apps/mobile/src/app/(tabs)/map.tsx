@@ -208,45 +208,6 @@ export default function MapScreen() {
           </ScrollView>
         </View>
 
-        {/* --- Bottom Navigation Bar --- */}
-        <View style={styles.bottomNav}>
-          <Link href="/map" asChild>
-            <View style={styles.navItemActive}>
-              <SymbolView name="map.fill" size={22} tintColor="#1856D6" fallback={<MapFallback />} />
-              <Text style={[styles.navText, styles.navTextActive]}>Map</Text>
-            </View>
-          </Link>
-
-          <Link href="/my-reports" asChild>
-            <View style={styles.navItem}>
-              <SymbolView name="list.bullet" size={22} tintColor="#6B7280" fallback={<ListFallback />} />
-              <Text style={styles.navText}>My reports</Text>
-            </View>
-          </Link>
-
-          {/* Floating Action Button */}
-          <Link href="/create-report" asChild>
-            <View style={styles.fabContainer}>
-              <View style={styles.fabButton}>
-                <SymbolView name="plus" size={26} tintColor="#FFFFFF" fallback={<PlusFallback />} />
-              </View>
-            </View>
-          </Link>
-
-          <Link href="/updates" asChild>
-            <View style={styles.navItem}>
-              <SymbolView name="bell" size={22} tintColor="#6B7280" fallback={<BellNavFallback />} />
-              <Text style={styles.navText}>Updates</Text>
-            </View>
-          </Link>
-
-          <Link href="/profile" asChild>
-            <View style={styles.navItem}>
-              <SymbolView name="person" size={22} tintColor="#6B7280" fallback={<ProfileFallback />} />
-              <Text style={styles.navText}>Profile</Text>
-            </View>
-          </Link>
-        </View>
       </View>
     </SafeAreaView>
   );
