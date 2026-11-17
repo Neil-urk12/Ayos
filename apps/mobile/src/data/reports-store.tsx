@@ -19,8 +19,8 @@ type ReportsContextValue = {
   getReport: (id: string) => Report | undefined;
   saveDraft: (draft: ReportDraft) => void;
   findSimilar: (draft: ReportDraft) => SimilarReport[];
-  /** Files the draft as a new report and returns its id. */
-  submitNew: () => string | undefined;
+  /** Files a draft as a new report and returns its id. */
+  submitNew: (draft: ReportDraft) => string;
   /** Adds the draft to an existing report and returns that report's id. */
   joinExisting: (id: string) => string;
   confirmFix: (id: string, fixed: boolean) => void;
@@ -54,13 +54,12 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
           const bOpen = b.report.status !== 'resolved' ? 0 : 1;
           return aOpen - bOpen || a.distance - b.distance;
         }),
-    submitNew: () => {
-      if (!draft) return undefined;
+    submitNew: (draft) => {
       const now = new Date();
       const id = `AY-0${nextNumber++}`;
       const report: Report = {
         id,
-        title: draft.description.trim().split(/[.\n]/)[0] || categoryLabels[draft.category],
+        title: `${categoryLabels[draft.category]} on ${draft.street}`,
         category: draft.category,
         street: draft.street,
         area: draft.area,
@@ -77,12 +76,10 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
         map: { x: 0.44, y: 0.53 },
       };
       setReports((current) => [report, ...current]);
-      setDraft(null);
       return id;
     },
     joinExisting: (id) => {
       update(id, (r) => (r.mine ? {} : { mine: true, reportCount: r.reportCount + 1 }));
-      setDraft(null);
       return id;
     },
     confirmFix: (id, fixed) =>
