@@ -1,415 +1,349 @@
-import React from 'react';
+import { router } from 'expo-router';
+import { useState } from 'react';
 import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
+  TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
-import { SymbolView } from 'expo-symbols';
-import { Link } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { Button } from '@/components/ayos/button';
+import { Icon } from '@/components/ayos/icon';
+import { HeaderNote, ScreenHeader } from '@/components/ayos/screen-header';
+import { colors, fonts, radius, type } from '@/constants/design';
+import {
+  categoryLabels,
+  categoryOrder,
+  draftLocation,
+  formatTime,
+  type Category,
+  type ReportDraft,
+} from '@/data/reports';
+import { useReports } from '@/data/reports-store';
+
+const MAX_PHOTOS = 3;
 
 export default function CreateReportScreen() {
+  const insets = useSafeAreaInsets();
+  const { saveDraft, findSimilar, submitNew } = useReports();
+
+  const [photos, setPhotos] = useState<string[]>(() => [formatTime(new Date())]);
+  const [category, setCategory] = useState<Category | null>(null);
+  const [description, setDescription] = useState('');
+  const [danger, setDanger] = useState(false);
+
+  const canSend = photos.length > 0 && category !== null;
+
+  const send = () => {
+    if (!category) return;
+    const draft: ReportDraft = {
+      category,
+      description,
+      danger,
+      street: draftLocation.street,
+      area: draftLocation.area,
+      accuracy: draftLocation.accuracy,
+      photoTakenAt: photos[0],
+    };
+    saveDraft(draft);
+
+    if (findSimilar(draft).length > 0) {
+      router.push('/duplicate-check');
+      return;
+    }
+    router.replace({ pathname: '/report/[id]', params: { id: submitNew(draft), sent: '1' } });
+  };
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="dark" />
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+    <View style={styles.screen}>
+      <ScreenHeader title="New report" right={<HeaderNote>Draft saved</HeaderNote>} />
+
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* --- Header Row --- */}
-        <View style={styles.header}>
-          <Link href="/map" style={styles.backLinkWrapper}>
-            <View style={styles.backButton}>
-              <SymbolView name="chevron.left" size={18} tintColor="#111827" fallback={<BackFallback />} />
-            </View>
-          </Link>
-          <Text style={styles.headerTitle}>New report</Text>
-          <Text style={styles.draftText}>Draft saved</Text>
-        </View>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <View style={styles.field}>
+            <FieldLabel required>Photo</FieldLabel>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.photos}
+            >
+              {photos.map((takenAt, index) => (
+                <View
+                  key={`${takenAt}-${index}`}
+                  style={styles.photo}
+                  accessibilityLabel={`Photo ${index + 1}, taken ${takenAt}`}
+                >
+                  <Icon name="image" size={34} color="#5B6170" />
+                  <Text style={styles.photoBadge}>Taken {takenAt}</Text>
+                </View>
+              ))}
+              {photos.length < MAX_PHOTOS && (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Add another angle"
+                  onPress={() => setPhotos((current) => [...current, formatTime(new Date())])}
+                  style={({ pressed }) => [styles.addPhoto, pressed && styles.pressed]}
+                >
+                  <Icon name="camera" size={26} color={colors.textSecondary} />
+                  <Text style={styles.addPhotoText}>Add angle</Text>
+                </Pressable>
+              )}
+            </ScrollView>
+            <Text style={styles.hint}>Avoid faces and plate numbers. Up to 3 photos.</Text>
+          </View>
 
-        {/* --- Photo Section --- */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>
-            Photo <Text style={styles.asterisk}>*</Text>
-          </Text>
-          
-          <View style={styles.photosRow}>
-            {/* Captured Photo Card */}
-            <View style={styles.photoCardMain}>
-              <SymbolView name="photo" size={32} tintColor="#71767E" fallback={<PhotoFallback />} />
-              <View style={styles.timeBadge}>
-                <Text style={styles.timeBadgeText}>Taken 9:41 AM</Text>
-              </View>
-            </View>
-
-            {/* Add Angle Card */}
-            <View style={styles.photoCardAdd}>
-              <SymbolView name="camera" size={26} tintColor="#1856D6" fallback={<CameraFallback />} />
-              <Text style={styles.addAngleText}>Add angle</Text>
+          <View style={styles.field}>
+            <FieldLabel required>What&apos;s the problem?</FieldLabel>
+            <View style={styles.categories} accessibilityRole="radiogroup">
+              {categoryOrder.map((option) => {
+                const selected = category === option;
+                return (
+                  <Pressable
+                    key={option}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: selected }}
+                    onPress={() => setCategory(option)}
+                    style={[styles.category, selected && styles.categorySelected]}
+                  >
+                    <Text style={[styles.categoryText, selected && styles.categoryTextSelected]}>
+                      {categoryLabels[option]}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
           </View>
 
-          <Text style={styles.hintText}>Avoid faces and plate numbers. Up to 3 photos.</Text>
-        </View>
-
-        {/* --- What's the problem Section --- */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>
-            What's the problem? <Text style={styles.asterisk}>*</Text>
-          </Text>
-
-          <View style={styles.problemsGrid}>
-            <View style={[styles.problemCard, styles.problemCardActive]}>
-              <Text style={[styles.problemCardText, styles.problemCardTextActive]}>Road damage</Text>
-            </View>
-            <View style={styles.problemCard}>
-              <Text style={styles.problemCardText}>Drainage</Text>
-            </View>
-            <View style={styles.problemCard}>
-              <Text style={styles.problemCardText}>Streetlight</Text>
-            </View>
-            <View style={styles.problemCard}>
-              <Text style={styles.problemCardText}>Sidewalk</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* --- Location Section --- */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>
-            Location <Text style={styles.asterisk}>*</Text>
-          </Text>
-
-          <View style={styles.mapCard}>
-            {/* Mini Map Graphic Simulation */}
-            <View style={styles.miniMap}>
-              <View style={styles.miniMapRoadH} />
-              <View style={styles.miniMapRoadV} />
-              <View style={styles.miniMapPin}>
-                <SymbolView name="mappin" size={16} tintColor="#FFFFFF" fallback={<PinFallback />} />
+          <View style={styles.field}>
+            <FieldLabel required>Location</FieldLabel>
+            <View style={styles.locationCard}>
+              <View style={styles.miniMap} accessibilityLabel="Map preview of the pin">
+                <View style={styles.miniRoadAcross} />
+                <View style={styles.miniRoadDown} />
+                <View style={styles.pin}>
+                  <View style={styles.pinHead}>
+                    <View style={styles.pinDot} />
+                  </View>
+                </View>
               </View>
-            </View>
-
-            {/* Location Details Footer */}
-            <View style={styles.mapFooter}>
-              <View>
-                <Text style={styles.locationTitle}>Gorordo Ave, Lahug</Text>
-                <Text style={styles.locationMeta}>From GPS · accurate to about 8 m</Text>
-              </View>
-              <View style={styles.adjustButton}>
-                <Text style={styles.adjustButtonText}>Adjust pin</Text>
+              <View style={styles.locationRow}>
+                <View style={styles.locationText}>
+                  <Text style={styles.locationName}>
+                    {draftLocation.street}, {draftLocation.area}
+                  </Text>
+                  <Text style={styles.locationMeta}>
+                    From GPS · accurate to about {draftLocation.accuracy} m
+                  </Text>
+                </View>
+                <Button label="Adjust pin" variant="secondary" size="md" style={styles.adjust} />
               </View>
             </View>
           </View>
-        </View>
 
-        {/* --- Short Description Section --- */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Short description</Text>
-          <View style={styles.descriptionBox}>
-            <Text style={styles.descriptionText}>
-              About 1 m wide, near the jeepney stop. Motorcycles swerve around it.
-            </Text>
+          <View style={styles.field}>
+            <FieldLabel>Short description</FieldLabel>
+            <TextInput
+              value={description}
+              onChangeText={setDescription}
+              placeholder="Size, landmarks, how it affects people"
+              placeholderTextColor={colors.placeholder}
+              accessibilityLabel="Short description"
+              multiline
+              maxLength={280}
+              style={styles.description}
+            />
           </View>
-        </View>
 
-        {/* --- Danger Toggle Section --- */}
-        <View style={styles.dangerCard}>
-          <View style={styles.dangerInfo}>
-            <Text style={styles.dangerTitle}>Is it a danger to people right now?</Text>
-            <Text style={styles.dangerSubtitle}>Helps the LGU judge public safety impact</Text>
-          </View>
-          <View style={styles.toggleContainer}>
-            <View style={styles.toggleTrackActive}>
-              <View style={styles.toggleThumbActive} />
+          <View style={styles.dangerCard}>
+            <View style={styles.dangerText}>
+              <Text style={styles.dangerTitle}>Is it a danger to people right now?</Text>
+              <Text style={styles.dangerMeta}>Helps the LGU judge public safety impact</Text>
             </View>
+            <Switch
+              value={danger}
+              onValueChange={setDanger}
+              accessibilityLabel="Danger to people right now"
+              trackColor={{ false: colors.borderStrong, true: colors.primary }}
+              thumbColor={colors.surface}
+              ios_backgroundColor={colors.borderStrong}
+            />
           </View>
-        </View>
+        </ScrollView>
 
-        {/* --- Submit Button --- */}
-        <View style={styles.submitButton}>
-          <Text style={styles.submitButtonText}>Submit report</Text>
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <Button label="Send report" onPress={send} disabled={!canSend} />
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
-/* --- Fallback Icons (Android/Web) --- */
-function BackFallback() { return <Text style={{ fontSize: 16 }}>‹</Text>; }
-function PhotoFallback() { return <Text style={{ fontSize: 22 }}>🖼️</Text>; }
-function CameraFallback() { return <Text style={{ fontSize: 20 }}>📷</Text>; }
-function PinFallback() { return <Text style={{ fontSize: 12, color: '#FFF' }}>📍</Text>; }
+function FieldLabel({ children, required }: { children: string; required?: boolean }) {
+  return (
+    <Text style={styles.label}>
+      {children}
+      {required ? <Text style={styles.required}> *</Text> : null}
+    </Text>
+  );
+}
 
-/* --- Styles --- */
+const PHOTO_WIDTH = 150;
+const PHOTO_HEIGHT = 112;
+
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#F7F9FC',
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 36,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  backLinkWrapper: {
-    padding: 2,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#FFFFFF',
+  screen: { flex: 1, backgroundColor: colors.background },
+  flex: { flex: 1 },
+  content: { padding: 16, paddingTop: 20, gap: 26 },
+  field: { gap: 10 },
+  label: { ...type.label, fontSize: 16 },
+  required: { color: colors.danger },
+  photos: { gap: 10 },
+  photo: {
+    width: PHOTO_WIDTH,
+    height: PHOTO_HEIGHT,
+    borderRadius: 14,
+    backgroundColor: colors.photo,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#E4E8EF',
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#111827',
-  },
-  draftText: {
-    fontSize: 14,
-    color: '#5C6470',
-    fontWeight: '500',
-  },
-  section: {
-    marginBottom: 20,
-  },
-  sectionLabel: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#141A24',
-    marginBottom: 10,
-  },
-  asterisk: {
-    color: '#D93838',
-  },
-  photosRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 8,
-  },
-  photoCardMain: {
-    width: 140,
-    height: 140,
-    borderRadius: 16,
-    backgroundColor: '#DCDFE4',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  timeBadge: {
+  photoBadge: {
     position: 'absolute',
+    left: 8,
     bottom: 8,
-    backgroundColor: '#272C35',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    overflow: 'hidden',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
     borderRadius: 6,
+    backgroundColor: colors.photoBadge,
+    color: colors.onPrimary,
+    fontFamily: fonts.semibold,
+    fontSize: 13,
   },
-  timeBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  photoCardAdd: {
-    width: 120,
-    height: 140,
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#D4DAE3',
+  addPhoto: {
+    width: 112,
+    height: PHOTO_HEIGHT,
+    borderRadius: 14,
+    borderWidth: 1.5,
     borderStyle: 'dashed',
+    borderColor: '#A9B1BC',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
   },
-  addAngleText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1856D6',
-  },
-  hintText: {
-    fontSize: 12.5,
-    color: '#5C6470',
-  },
-  problemsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  problemCard: {
-    width: '48%',
-    height: 52,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+  addPhotoText: { fontFamily: fonts.medium, fontSize: 15, color: colors.textSecondary },
+  pressed: { opacity: 0.6 },
+  hint: { ...type.small, fontSize: 13.5, color: colors.textMuted },
+  categories: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
+  category: {
+    flexBasis: '47%',
+    flexGrow: 1,
+    height: 48,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: '#D4DAE3',
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  problemCardActive: {
-    borderColor: '#1856D6',
+  categorySelected: {
     borderWidth: 2,
-    backgroundColor: '#F3F6FD',
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
   },
-  problemCardText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  problemCardTextActive: {
-    color: '#1856D6',
-    fontWeight: '700',
-  },
-  mapCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+  categoryText: { fontFamily: fonts.medium, fontSize: 15.5, color: colors.text },
+  categoryTextSelected: { fontFamily: fonts.semibold, color: '#1E3A8A' },
+  locationCard: {
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: '#D4DAE3',
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     overflow: 'hidden',
   },
-  miniMap: {
-    height: 110,
-    backgroundColor: '#E8EDF4',
-    position: 'relative',
-  },
-  miniMapRoadH: {
+  miniMap: { height: 84, backgroundColor: colors.map, overflow: 'hidden' },
+  miniRoadAcross: {
     position: 'absolute',
-    top: '40%',
-    left: 0,
-    right: 0,
-    height: 16,
-    backgroundColor: '#FFFFFF',
+    left: '-10%',
+    width: '120%',
+    top: 30,
+    height: 14,
+    backgroundColor: colors.mapRoad,
+    transform: [{ rotate: '1.5deg' }],
   },
-  miniMapRoadV: {
+  miniRoadDown: {
     position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: '46%',
-    width: 16,
-    backgroundColor: '#FFFFFF',
+    top: -20,
+    height: 130,
+    left: '43%',
+    width: 14,
+    backgroundColor: colors.mapRoad,
+    transform: [{ rotate: '-8deg' }],
   },
-  miniMapPin: {
-    position: 'absolute',
-    top: '28%',
-    left: '47.5%',
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: '#D93838',
+  pin: { position: 'absolute', left: '45%', top: 16 },
+  pinHead: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderBottomRightRadius: 0,
+    backgroundColor: colors.danger,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
+    transform: [{ rotate: '45deg' }],
   },
-  mapFooter: {
+  pinDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.surface },
+  locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 14,
+    gap: 12,
+    padding: 12,
+    paddingLeft: 12,
   },
-  locationTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 2,
-  },
-  locationMeta: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  adjustButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
+  locationText: { flex: 1, gap: 2 },
+  locationName: { fontFamily: fonts.semibold, fontSize: 16, color: colors.text },
+  locationMeta: { ...type.meta, fontSize: 13.5, color: colors.textSecondary },
+  adjust: { paddingHorizontal: 12 },
+  description: {
+    minHeight: 60,
+    maxHeight: 140,
+    paddingHorizontal: 13,
+    paddingTop: 11,
+    paddingBottom: 11,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: '#D4DAE3',
-    backgroundColor: '#FFFFFF',
-  },
-  adjustButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  descriptionBox: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#D4DAE3',
-    padding: 14,
-    minHeight: 70,
-  },
-  descriptionText: {
-    fontSize: 15,
-    color: '#111827',
-    lineHeight: 22,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
+    fontFamily: fonts.regular,
+    fontSize: 16,
+    lineHeight: 21,
+    color: colors.text,
+    textAlignVertical: 'top',
   },
   dangerCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
+    gap: 12,
+    padding: 14,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: '#D4DAE3',
-    padding: 16,
-    marginBottom: 24,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
-  dangerInfo: {
-    flex: 1,
-    paddingRight: 10,
-  },
-  dangerTitle: {
-    fontSize: 14.5,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 3,
-  },
-  dangerSubtitle: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  toggleContainer: {
-    width: 52,
-    height: 30,
-  },
-  toggleTrackActive: {
-    flex: 1,
-    backgroundColor: '#1856D6',
-    borderRadius: 15,
-    padding: 2,
-    justifyContent: 'center',
-    alignItems: 'flex-end',
-  },
-  toggleThumbActive: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: '#FFFFFF',
-  },
-  submitButton: {
-    backgroundColor: '#1856D6',
-    borderRadius: 12,
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  submitButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
+  dangerText: { flex: 1, gap: 2 },
+  dangerTitle: { fontFamily: fonts.semibold, fontSize: 16, color: colors.text },
+  dangerMeta: { ...type.meta, fontSize: 14, color: colors.textSecondary },
+  footer: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    backgroundColor: colors.surface,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderStrong,
   },
 });
