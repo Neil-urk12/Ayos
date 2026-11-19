@@ -39,5 +39,13 @@ yarn-error.*
 example
 
 # generated native folders
-/apps/mobile/ios
-/apps/mobile/android
+/ios
+/android
+
+# firebase
+.firebase/
+*-debug.log
+
+# native Firebase config (only needed with @react-native-firebase; keep out of git)
+google-services.json
+GoogleService-Info.plist
