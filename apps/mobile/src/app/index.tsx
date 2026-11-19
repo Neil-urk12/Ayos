@@ -125,6 +125,14 @@ export default function SignInScreen() {
 
             <Button label="Sign in" onPress={signIn} style={styles.signIn} />
 
+            <Pressable
+              accessibilityRole="button"
+              onPress={signIn}
+              style={({ pressed }) => [styles.guestButton, pressed && styles.guestButtonPressed]}
+            >
+              <Text style={styles.guestButtonText}>Sign in as guest</Text>
+            </Pressable>
+
             <View style={styles.links}>
               <Link href="/create-account" style={styles.link}>
                 Create an account
@@ -242,6 +250,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 18,
+  },
+  guestButton: {
+    height: 50,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  guestButtonPressed: {
+    opacity: 0.8,
+  },
+  guestButtonText: {
+    fontFamily: fonts.semibold,
+    fontSize: 16,
+    color: colors.primary,
   },
   link: {
     fontFamily: fonts.medium,
