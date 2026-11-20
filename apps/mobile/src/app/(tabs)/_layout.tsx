@@ -14,7 +14,7 @@ export default function TabLayout() {
     >
       <Tabs.Screen name="map" />
       <Tabs.Screen name="my-reports" />
-      <Tabs.Screen name="updates" />
+      <Tabs.Screen name="safety-tips" />
       <Tabs.Screen name="profile" />
     </Tabs>
   );

@@ -78,14 +78,6 @@ export default function MapScreen() {
               style={styles.searchInput}
             />
           </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Updates"
-            onPress={() => router.navigate('/updates')}
-            style={styles.bell}
-          >
-            <Icon name="bell" size={22} />
-          </Pressable>
         </View>
 
         <ScrollView
