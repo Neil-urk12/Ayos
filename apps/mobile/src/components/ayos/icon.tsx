@@ -22,6 +22,7 @@ const featherIcons = {
   alert: 'alert-triangle',
   share: 'share',
   'log-out': 'log-out',
+  shield: 'shield'
 } as const;
 
 const ionIcons = {
