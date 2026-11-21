@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { fonts, radius } from '@/constants/design';
-import { statusLabels, type ReportStatus } from '@/data/reports';
+import { fonts, radius } from '../../constants/design';
+import { statusLabels, type ReportStatus } from '../../data/reports';
 
 const tones: Record<ReportStatus, { bg: string; fg: string }> = {
   received: { bg: '#EEF0F3', fg: '#374151' },

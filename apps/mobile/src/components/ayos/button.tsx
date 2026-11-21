@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
 
-import { colors, fonts, radius } from '@/constants/design';
+import { colors, fonts, radius } from '../../constants/design';
 
 type ButtonVariant = 'primary' | 'secondary' | 'success';
 

@@ -13,10 +13,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button } from '@/components/ayos/button';
-import { Icon } from '@/components/ayos/icon';
-import { HeaderNote, ScreenHeader } from '@/components/ayos/screen-header';
-import { colors, fonts, radius, type } from '@/constants/design';
+import { Button } from '../components/ayos/button';
+import { Icon } from '../components/ayos/icon';
+import { HeaderNote, ScreenHeader } from '../components/ayos/screen-header';
+import { colors, fonts, radius, type } from '../constants/design';
 import {
   categoryLabels,
   categoryOrder,
@@ -24,8 +24,8 @@ import {
   formatTime,
   type Category,
   type ReportDraft,
-} from '@/data/reports';
-import { useReports } from '@/data/reports-store';
+} from '../data/reports';
+import { useReports } from '../data/reports-store';
 
 const MAX_PHOTOS = 3;
 
@@ -57,7 +57,10 @@ export default function CreateReportScreen() {
       router.push('/duplicate-check');
       return;
     }
-    router.replace({ pathname: '/report/[id]', params: { id: submitNew(draft), sent: '1' } });
+    router.replace({
+      pathname: '/report/[id]',
+      params: { id: submitNew(draft), sent: '1' },
+    });
   };
 
   return (
@@ -239,7 +242,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
   },
-  addPhotoText: { fontFamily: fonts.medium, fontSize: 15, color: colors.textSecondary },
+  addPhotoText: {
+    fontFamily: fonts.medium,
+    fontSize: 15,
+    color: colors.textSecondary,
+  },
   pressed: { opacity: 0.6 },
   hint: { ...type.small, fontSize: 13.5, color: colors.textMuted },
   categories: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
@@ -259,7 +266,11 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     backgroundColor: colors.primarySoft,
   },
-  categoryText: { fontFamily: fonts.medium, fontSize: 15.5, color: colors.text },
+  categoryText: {
+    fontFamily: fonts.medium,
+    fontSize: 15.5,
+    color: colors.text,
+  },
   categoryTextSelected: { fontFamily: fonts.semibold, color: '#1E3A8A' },
   locationCard: {
     borderRadius: radius.lg,
@@ -298,7 +309,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     transform: [{ rotate: '45deg' }],
   },
-  pinDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.surface },
+  pinDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.surface,
+  },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -307,7 +323,11 @@ const styles = StyleSheet.create({
     paddingLeft: 12,
   },
   locationText: { flex: 1, gap: 2 },
-  locationName: { fontFamily: fonts.semibold, fontSize: 16, color: colors.text },
+  locationName: {
+    fontFamily: fonts.semibold,
+    fontSize: 16,
+    color: colors.text,
+  },
   locationMeta: { ...type.meta, fontSize: 13.5, color: colors.textSecondary },
   adjust: { paddingHorizontal: 12 },
   description: {

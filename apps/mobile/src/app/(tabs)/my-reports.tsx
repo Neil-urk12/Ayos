@@ -3,13 +3,13 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button } from '@/components/ayos/button';
-import { Icon } from '@/components/ayos/icon';
-import { ReportRow } from '@/components/ayos/report-row';
-import { StatusBadge } from '@/components/ayos/status-badge';
-import { colors, fonts, radius, type } from '@/constants/design';
-import { othersCount, type Report } from '@/data/reports';
-import { useReports } from '@/data/reports-store';
+import { Button } from '../../components/ayos/button';
+import { Icon } from '../../components/ayos/icon';
+import { ReportRow } from '../../components/ayos/report-row';
+import { StatusBadge } from '../../components/ayos/status-badge';
+import { colors, fonts, radius, type } from '../../constants/design';
+import { othersCount, type Report } from '../../data/reports';
+import { useReports } from '../../data/reports-store';
 
 type Tab = 'open' | 'resolved';
 

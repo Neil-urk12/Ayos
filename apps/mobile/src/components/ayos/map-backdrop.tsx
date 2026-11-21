@@ -1,6 +1,6 @@
 import { StyleSheet, View, type DimensionValue } from 'react-native';
 
-import { colors } from '@/constants/design';
+import { colors } from '../../constants/design';
 
 type Road = { at: DimensionValue; width: number; angle: number };
 

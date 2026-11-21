@@ -8,9 +8,11 @@
     "scheme": "ayos",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "bundleIdentifier": "com.ayos.app",
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "com.ayos.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router/js-tabs';
 
-import { TabBar } from '@/components/ayos/tab-bar';
-import { colors } from '@/constants/design';
+import { TabBar } from '../../components/ayos/tab-bar';
+import { colors } from '../../constants/design';
 
 export default function TabLayout() {
   return (

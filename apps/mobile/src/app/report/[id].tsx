@@ -2,13 +2,13 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button } from '@/components/ayos/button';
-import { Icon } from '@/components/ayos/icon';
-import { PhotoThumb } from '@/components/ayos/photo-thumb';
-import { ScreenHeader } from '@/components/ayos/screen-header';
-import { colors, fonts, radius, type } from '@/constants/design';
-import { categoryLabels, othersCount, statusLabels, type Report } from '@/data/reports';
-import { useReports } from '@/data/reports-store';
+import { Button } from '../../components/ayos/button';
+import { Icon } from '../../components/ayos/icon';
+import { PhotoThumb } from '../../components/ayos/photo-thumb';
+import { ScreenHeader } from '../../components/ayos/screen-header';
+import { colors, fonts, radius, type } from '../../constants/design';
+import { categoryLabels, othersCount, statusLabels, type Report } from '../../data/reports';
+import { useReports } from '../../data/reports-store';
 
 type StepState = 'done' | 'current' | 'pending';
 type Step = { title: string; detail: string; state: StepState };
