@@ -48,12 +48,54 @@ const INITIAL_ISSUES: IssueGroup[] = [
 		safetyImpact: 'High',
 		residentUpdate: 'Repair crew scheduled for Nov 18. Please keep to the inner lane.',
 		reportItems: [
-			{ id: 'r1', code: 'AY-01391', submitted: 'Nov 6, 7:12 AM', matchScore: 'First report', mergedBy: '—', canUnmerge: false },
-			{ id: 'r2', code: 'AY-01398', submitted: 'Nov 6, 5:40 PM', matchScore: '0.92', mergedBy: 'Engr. [NAME]', canUnmerge: true },
-			{ id: 'r3', code: 'AY-01420', submitted: 'Nov 8, 8:05 AM', matchScore: '0.84', mergedBy: 'Engr. [NAME]', canUnmerge: true },
-			{ id: 'r4', code: 'AY-01433', submitted: 'Nov 9, 6:30 PM', matchScore: '0.79', mergedBy: 'Staff [NAME]', canUnmerge: true },
-			{ id: 'r5', code: 'AY-01451', submitted: 'Nov 13, 9:15 AM', matchScore: '0.90', mergedBy: 'Staff [NAME]', canUnmerge: true },
-			{ id: 'r6', code: 'AY-01482', submitted: 'Nov 15, 9:43 AM', matchScore: '0.88', mergedBy: 'Engr. [NAME]', canUnmerge: true }
+			{
+				id: 'r1',
+				code: 'AY-01391',
+				submitted: 'Nov 6, 7:12 AM',
+				matchScore: 'First report',
+				mergedBy: '—',
+				canUnmerge: false
+			},
+			{
+				id: 'r2',
+				code: 'AY-01398',
+				submitted: 'Nov 6, 5:40 PM',
+				matchScore: '0.92',
+				mergedBy: 'Engr. [NAME]',
+				canUnmerge: true
+			},
+			{
+				id: 'r3',
+				code: 'AY-01420',
+				submitted: 'Nov 8, 8:05 AM',
+				matchScore: '0.84',
+				mergedBy: 'Engr. [NAME]',
+				canUnmerge: true
+			},
+			{
+				id: 'r4',
+				code: 'AY-01433',
+				submitted: 'Nov 9, 6:30 PM',
+				matchScore: '0.79',
+				mergedBy: 'Staff [NAME]',
+				canUnmerge: true
+			},
+			{
+				id: 'r5',
+				code: 'AY-01451',
+				submitted: 'Nov 13, 9:15 AM',
+				matchScore: '0.90',
+				mergedBy: 'Staff [NAME]',
+				canUnmerge: true
+			},
+			{
+				id: 'r6',
+				code: 'AY-01482',
+				submitted: 'Nov 15, 9:43 AM',
+				matchScore: '0.88',
+				mergedBy: 'Engr. [NAME]',
+				canUnmerge: true
+			}
 		]
 	},
 	{
@@ -74,10 +116,38 @@ const INITIAL_ISSUES: IssueGroup[] = [
 		safetyImpact: 'High',
 		residentUpdate: 'Barricade placed on site; replacement cover ordered.',
 		reportItems: [
-			{ id: 'r21', code: 'AY-01460', submitted: 'Nov 14, 8:20 AM', matchScore: 'First report', mergedBy: '—', canUnmerge: false },
-			{ id: 'r22', code: 'AY-01465', submitted: 'Nov 14, 1:15 PM', matchScore: '0.89', mergedBy: 'Engr. [NAME]', canUnmerge: true },
-			{ id: 'r23', code: 'AY-01471', submitted: 'Nov 14, 6:50 PM', matchScore: '0.85', mergedBy: 'Staff [NAME]', canUnmerge: true },
-			{ id: 'r24', code: 'AY-01489', submitted: 'Nov 15, 10:12 AM', matchScore: '0.86', mergedBy: 'Engr. [NAME]', canUnmerge: true }
+			{
+				id: 'r21',
+				code: 'AY-01460',
+				submitted: 'Nov 14, 8:20 AM',
+				matchScore: 'First report',
+				mergedBy: '—',
+				canUnmerge: false
+			},
+			{
+				id: 'r22',
+				code: 'AY-01465',
+				submitted: 'Nov 14, 1:15 PM',
+				matchScore: '0.89',
+				mergedBy: 'Engr. [NAME]',
+				canUnmerge: true
+			},
+			{
+				id: 'r23',
+				code: 'AY-01471',
+				submitted: 'Nov 14, 6:50 PM',
+				matchScore: '0.85',
+				mergedBy: 'Staff [NAME]',
+				canUnmerge: true
+			},
+			{
+				id: 'r24',
+				code: 'AY-01489',
+				submitted: 'Nov 15, 10:12 AM',
+				matchScore: '0.86',
+				mergedBy: 'Engr. [NAME]',
+				canUnmerge: true
+			}
 		]
 	},
 	{
@@ -98,9 +168,30 @@ const INITIAL_ISSUES: IssueGroup[] = [
 		safetyImpact: 'Medium',
 		residentUpdate: 'Electrical maintenance team assigned for evening inspection.',
 		reportItems: [
-			{ id: 'r31', code: 'AY-01410', submitted: 'Nov 10, 7:45 PM', matchScore: 'First report', mergedBy: '—', canUnmerge: false },
-			{ id: 'r32', code: 'AY-01418', submitted: 'Nov 11, 8:10 PM', matchScore: '0.81', mergedBy: 'Staff [NAME]', canUnmerge: true },
-			{ id: 'r33', code: 'AY-01440', submitted: 'Nov 12, 7:05 PM', matchScore: '0.78', mergedBy: 'Staff [NAME]', canUnmerge: true }
+			{
+				id: 'r31',
+				code: 'AY-01410',
+				submitted: 'Nov 10, 7:45 PM',
+				matchScore: 'First report',
+				mergedBy: '—',
+				canUnmerge: false
+			},
+			{
+				id: 'r32',
+				code: 'AY-01418',
+				submitted: 'Nov 11, 8:10 PM',
+				matchScore: '0.81',
+				mergedBy: 'Staff [NAME]',
+				canUnmerge: true
+			},
+			{
+				id: 'r33',
+				code: 'AY-01440',
+				submitted: 'Nov 12, 7:05 PM',
+				matchScore: '0.78',
+				mergedBy: 'Staff [NAME]',
+				canUnmerge: true
+			}
 		]
 	},
 	{
@@ -121,9 +212,30 @@ const INITIAL_ISSUES: IssueGroup[] = [
 		safetyImpact: 'High',
 		residentUpdate: 'Debris clearing scheduled along canal inlet.',
 		reportItems: [
-			{ id: 'r41', code: 'AY-01370', submitted: 'Nov 3, 2:10 PM', matchScore: 'First report', mergedBy: '—', canUnmerge: false },
-			{ id: 'r42', code: 'AY-01385', submitted: 'Nov 5, 4:25 PM', matchScore: '0.83', mergedBy: 'Engr. [NAME]', canUnmerge: true },
-			{ id: 'r43', code: 'AY-01412', submitted: 'Nov 7, 11:00 AM', matchScore: '0.77', mergedBy: 'Staff [NAME]', canUnmerge: true }
+			{
+				id: 'r41',
+				code: 'AY-01370',
+				submitted: 'Nov 3, 2:10 PM',
+				matchScore: 'First report',
+				mergedBy: '—',
+				canUnmerge: false
+			},
+			{
+				id: 'r42',
+				code: 'AY-01385',
+				submitted: 'Nov 5, 4:25 PM',
+				matchScore: '0.83',
+				mergedBy: 'Engr. [NAME]',
+				canUnmerge: true
+			},
+			{
+				id: 'r43',
+				code: 'AY-01412',
+				submitted: 'Nov 7, 11:00 AM',
+				matchScore: '0.77',
+				mergedBy: 'Staff [NAME]',
+				canUnmerge: true
+			}
 		]
 	},
 	{
@@ -144,8 +256,22 @@ const INITIAL_ISSUES: IssueGroup[] = [
 		safetyImpact: 'Medium',
 		residentUpdate: 'Logged for site assessment by district engineering.',
 		reportItems: [
-			{ id: 'r51', code: 'AY-01444', submitted: 'Nov 12, 9:30 AM', matchScore: 'First report', mergedBy: '—', canUnmerge: false },
-			{ id: 'r52', code: 'AY-01468', submitted: 'Nov 14, 3:40 PM', matchScore: '0.80', mergedBy: 'Staff [NAME]', canUnmerge: true }
+			{
+				id: 'r51',
+				code: 'AY-01444',
+				submitted: 'Nov 12, 9:30 AM',
+				matchScore: 'First report',
+				mergedBy: '—',
+				canUnmerge: false
+			},
+			{
+				id: 'r52',
+				code: 'AY-01468',
+				submitted: 'Nov 14, 3:40 PM',
+				matchScore: '0.80',
+				mergedBy: 'Staff [NAME]',
+				canUnmerge: true
+			}
 		]
 	},
 	{
@@ -166,7 +292,14 @@ const INITIAL_ISSUES: IssueGroup[] = [
 		safetyImpact: 'Low',
 		residentUpdate: 'Queued for routine pavement patching review.',
 		reportItems: [
-			{ id: 'r61', code: 'AY-01425', submitted: 'Nov 9, 10:15 AM', matchScore: 'First report', mergedBy: '—', canUnmerge: false }
+			{
+				id: 'r61',
+				code: 'AY-01425',
+				submitted: 'Nov 9, 10:15 AM',
+				matchScore: 'First report',
+				mergedBy: '—',
+				canUnmerge: false
+			}
 		]
 	},
 	{
@@ -187,7 +320,14 @@ const INITIAL_ISSUES: IssueGroup[] = [
 		safetyImpact: 'Low',
 		residentUpdate: 'Queued for bulb/starter check.',
 		reportItems: [
-			{ id: 'r71', code: 'AY-01455', submitted: 'Nov 13, 7:55 PM', matchScore: 'First report', mergedBy: '—', canUnmerge: false }
+			{
+				id: 'r71',
+				code: 'AY-01455',
+				submitted: 'Nov 13, 7:55 PM',
+				matchScore: 'First report',
+				mergedBy: '—',
+				canUnmerge: false
+			}
 		]
 	}
 ];
@@ -206,7 +346,8 @@ class QueueState {
 		this.items
 			.filter((item) => {
 				const matchCat = this.selectedCategory === 'ALL' || item.category === this.selectedCategory;
-				const matchBrgy = this.selectedBarangay === 'ALL' || item.barangay === this.selectedBarangay;
+				const matchBrgy =
+					this.selectedBarangay === 'ALL' || item.barangay === this.selectedBarangay;
 				return matchCat && matchBrgy;
 			})
 			.sort((a, b) => b.score - a.score)
@@ -215,7 +356,7 @@ class QueueState {
 	selectedIssue = $derived(
 		this.selectedIssueId === null
 			? null
-			: this.items.find((item) => item.id === this.selectedIssueId) ?? null
+			: (this.items.find((item) => item.id === this.selectedIssueId) ?? null)
 	);
 
 	criticalCount = $derived(this.filteredItems.filter((i) => i.score >= 80).length);
