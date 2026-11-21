@@ -9,8 +9,8 @@ import { colors, fonts, shadow } from '@/constants/design';
 const tabs: Record<string, { label: string; icon: IconName }> = {
   map: { label: 'Map', icon: 'map' },
   'my-reports': { label: 'My reports', icon: 'list' },
-  updates: { label: 'Updates', icon: 'bell' },
   profile: { label: 'Profile', icon: 'user' },
+  'safety-tips': { label: 'Safety tips', icon: 'shield' },
 };
 
 export const TAB_BAR_HEIGHT = 78;

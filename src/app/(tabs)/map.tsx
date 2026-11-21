@@ -78,14 +78,6 @@ export default function MapScreen() {
               style={styles.searchInput}
             />
           </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Updates"
-            onPress={() => router.navigate('/updates')}
-            style={styles.bell}
-          >
-            <Icon name="bell" size={22} />
-          </Pressable>
         </View>
 
         <ScrollView
@@ -204,15 +196,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     fontSize: 16,
     color: colors.text,
-  },
-  bell: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...shadow.card,
   },
   chips: { gap: 8, paddingHorizontal: 16 },
   chip: {
