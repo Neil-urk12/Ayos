@@ -197,15 +197,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.text,
   },
-  bell: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...shadow.card,
-  },
   chips: { gap: 8, paddingHorizontal: 16 },
   chip: {
     height: 36,

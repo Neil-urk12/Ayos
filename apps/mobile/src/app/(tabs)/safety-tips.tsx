@@ -96,6 +96,12 @@ const tipsByGroup: Record<UserType, SafetyTip[]> = {
   ],
 };
 
+const groups = [
+  ['motorists', 'Motorists'],
+  ['cyclists', 'Cyclists'],
+  ['pedestrians', 'Pedestrians'],
+] as const satisfies readonly (readonly [UserType, string])[];
+
 export default function SafetyTipsScreen() {
   const [tab, setTab] = useState<UserType>('motorists');
   const listed = tipsByGroup[tab];
@@ -107,13 +113,7 @@ export default function SafetyTipsScreen() {
       </Text>
 
       <View style={styles.tabs} accessibilityRole="tablist">
-        {(
-          [
-            ['motorists', 'Motorists'],
-            ['cyclists', 'Cyclists'],
-            ['pedestrians', 'Pedestrians'],
-          ] as const
-        ).map(([key, label]) => {
+        {groups.map(([key, label]) => {
           const active = tab === key;
           return (
             <Pressable
