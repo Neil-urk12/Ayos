@@ -3,19 +3,19 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, type IconName } from '@/components/ayos/icon';
-import { MapBackdrop } from '@/components/ayos/map-backdrop';
-import { ReportRow } from '@/components/ayos/report-row';
-import { StatusBadge } from '@/components/ayos/status-badge';
-import { categoryColors, colors, fonts, radius, shadow, type } from '@/constants/design';
+import { Icon, type IconName } from '../../components/ayos/icon';
+import { MapBackdrop } from '../../components/ayos/map-backdrop';
+import { ReportRow } from '../../components/ayos/report-row';
+import { StatusBadge } from '../../components/ayos/status-badge';
+import { categoryColors, colors, fonts, radius, shadow, type } from '../../constants/design';
 import {
   categoryLabels,
   categoryOrder,
   formatDistance,
   type Category,
   type Report,
-} from '@/data/reports';
-import { useReports } from '@/data/reports-store';
+} from '../../data/reports';
+import { useReports } from '../../data/reports-store';
 
 type Filter = 'all' | Category;
 

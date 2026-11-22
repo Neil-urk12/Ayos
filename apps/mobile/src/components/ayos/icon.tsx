@@ -1,7 +1,7 @@
 import Feather from '@expo/vector-icons/Feather';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
-import { colors } from '@/constants/design';
+import { colors } from '../../constants/design';
 
 const featherIcons = {
   wrench: 'tool',

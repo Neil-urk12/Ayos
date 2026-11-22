@@ -1,0 +1,101 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // LGU staff get a custom claim set from the Admin SDK: setCustomUserClaims(uid, { staff: true }).
+    function isStaff() {
+      return signedIn() && request.auth.token.staff == true;
+    }
+
+    function changedOnly(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    function supporterPath(reportId) {
+      return /databases/$(database)/documents/reports/$(reportId)/supporters/$(request.auth.uid);
+    }
+
+    function validName(value) {
+      return value is string && value.size() > 0 && value.size() <= 100;
+    }
+
+    // A user's own profile, written at sign-up by src/lib/firebase/users.ts.
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isStaff();
+
+      // Created once at sign-up: fixed field set, email must match the signed-in
+      // account, and role is always 'resident' (staff access comes from a custom claim).
+      allow create: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(
+          ['uid', 'fullName', 'email', 'lgu', 'role', 'createdAt', 'updatedAt'])
+        && request.resource.data.uid == uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.role == 'resident'
+        && validName(request.resource.data.fullName)
+        && validName(request.resource.data.lgu)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+
+      // Users may change their name and LGU; uid, email, role and createdAt are locked.
+      allow update: if isOwner(uid)
+        && changedOnly(['fullName', 'lgu', 'updatedAt'])
+        && validName(request.resource.data.fullName)
+        && validName(request.resource.data.lgu)
+        && request.resource.data.updatedAt == request.time;
+
+      allow delete: if false;
+    }
+
+    match /reports/{reportId} {
+      // Reports are public to signed-in residents.
+      allow read: if signedIn();
+
+      // New reports start as 'received' with the reporter as the only supporter.
+      allow create: if signedIn()
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.status == 'received'
+        && request.resource.data.reportCount == 1;
+
+      allow update: if
+        // Staff manage status, notes and assignment.
+        isStaff()
+        // The reporter may edit their own text. reporterId, status and counts stay locked.
+        || (isOwner(resource.data.reporterId) && changedOnly(['description', 'danger']))
+        // Joining: bump reportCount by exactly 1 in the same batch that creates your
+        // supporters/{uid} doc, so each person counts once.
+        || (signedIn()
+          && changedOnly(['reportCount'])
+          && request.resource.data.reportCount == resource.data.reportCount + 1
+          && !exists(supporterPath(reportId))
+          && existsAfter(supporterPath(reportId)))
+        // Confirming a fix: the reporter or a supporter answers a resolved report,
+        // either accepting it or reopening it as in_progress.
+        || ((isOwner(resource.data.reporterId) || exists(supporterPath(reportId)))
+          && resource.data.status == 'resolved'
+          && resource.data.awaitingConfirmation == true
+          && changedOnly(['awaitingConfirmation', 'status', 'statusNote', 'resolvedOn'])
+          && request.resource.data.awaitingConfirmation == false
+          && request.resource.data.status in ['resolved', 'in_progress']);
+
+      allow delete: if isStaff()
+        || (isOwner(resource.data.reporterId) && resource.data.status == 'received');
+
+      // reports/{reportId}/supporters/{uid}: one doc per resident who joined the report.
+      match /supporters/{uid} {
+        allow read: if signedIn();
+        allow create: if isOwner(uid);
+        allow delete: if isOwner(uid) || isStaff();
+      }
+    }
+
+    // Everything else is denied by default.
+  }
+}

@@ -2,13 +2,13 @@ import { Link, Redirect, router } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button } from '@/components/ayos/button';
-import { PhotoThumb } from '@/components/ayos/photo-thumb';
-import { ScreenHeader } from '@/components/ayos/screen-header';
-import { StatusBadge } from '@/components/ayos/status-badge';
-import { colors, fonts, radius, type } from '@/constants/design';
-import { formatDistance, othersCount, statusLabels } from '@/data/reports';
-import { useReports } from '@/data/reports-store';
+import { Button } from '../components/ayos/button';
+import { PhotoThumb } from '../components/ayos/photo-thumb';
+import { ScreenHeader } from '../components/ayos/screen-header';
+import { StatusBadge } from '../components/ayos/status-badge';
+import { colors, fonts, radius, type } from '../constants/design';
+import { formatDistance, othersCount, statusLabels } from '../data/reports';
+import { useReports } from '../data/reports-store';
 
 export default function DuplicateCheckScreen() {
   const insets = useSafeAreaInsets();
@@ -113,7 +113,12 @@ export default function DuplicateCheckScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: 16, gap: 16 },
-  intro: { ...type.body, fontSize: 16.5, lineHeight: 24, color: colors.textSecondary },
+  intro: {
+    ...type.body,
+    fontSize: 16.5,
+    lineHeight: 24,
+    color: colors.textSecondary,
+  },
   matchCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
@@ -138,7 +143,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   matchBody: { padding: 14, gap: 12 },
-  matchTitle: { fontFamily: fonts.semibold, fontSize: 18, lineHeight: 23, color: colors.text },
+  matchTitle: {
+    fontFamily: fonts.semibold,
+    fontSize: 18,
+    lineHeight: 23,
+    color: colors.text,
+  },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: {
     overflow: 'hidden',
@@ -150,7 +160,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
   },
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
   statusNote: { ...type.meta, fontSize: 14.5, color: colors.textSecondary },
   otherCard: {
     flexDirection: 'row',
@@ -179,5 +194,10 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.borderStrong,
   },
-  footerNote: { ...type.small, fontSize: 13.5, textAlign: 'center', color: colors.textSecondary },
+  footerNote: {
+    ...type.small,
+    fontSize: 13.5,
+    textAlign: 'center',
+    color: colors.textSecondary,
+  },
 });

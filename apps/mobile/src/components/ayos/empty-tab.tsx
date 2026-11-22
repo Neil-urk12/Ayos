@@ -2,8 +2,8 @@ import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Icon, type IconName } from '@/components/ayos/icon';
-import { colors, type } from '@/constants/design';
+import { Icon, type IconName } from './icon';
+import { colors, type } from '../../constants/design';
 
 type EmptyTabProps = {
   title: string;

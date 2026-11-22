@@ -1,7 +1,7 @@
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { Icon } from '@/components/ayos/icon';
-import { colors, radius } from '@/constants/design';
+import { Icon } from './icon';
+import { colors, radius } from '../../constants/design';
 
 type PhotoThumbProps = {
   tone?: string;

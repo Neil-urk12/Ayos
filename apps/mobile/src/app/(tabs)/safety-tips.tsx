@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Icon, type IconName } from '@/components/ayos/icon';
-import { colors, fonts, radius, type } from '@/constants/design';
+import { Icon, type IconName } from '../../components/ayos/icon';
+import { colors, fonts, radius, type } from '../../constants/design';
 
 type UserType = 'motorists' | 'cyclists' | 'pedestrians';
 

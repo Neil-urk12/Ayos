@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { PhotoThumb } from '@/components/ayos/photo-thumb';
-import { colors, fonts, type } from '@/constants/design';
+import { PhotoThumb } from './photo-thumb';
+import { colors, fonts, type } from '../../constants/design';
 
 type ReportRowProps = {
   title: string;
