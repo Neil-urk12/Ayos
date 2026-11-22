@@ -1,13 +1,14 @@
+import * as Location from 'expo-location';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, type IconName } from '@/components/ayos/icon';
-import { MapBackdrop } from '@/components/ayos/map-backdrop';
+import { Icon } from '@/components/ayos/icon';
+import { InteractiveMap, type InteractiveMapHandle } from '@/components/ayos/interactive-map';
 import { ReportRow } from '@/components/ayos/report-row';
 import { StatusBadge } from '@/components/ayos/status-badge';
-import { categoryColors, colors, fonts, radius, shadow, type } from '@/constants/design';
+import { colors, fonts, radius, shadow, type } from '@/constants/design';
 import {
   categoryLabels,
   categoryOrder,
@@ -19,22 +20,34 @@ import { useReports } from '@/data/reports-store';
 
 type Filter = 'all' | Category;
 
-const categoryIcons: Record<Category, IconName> = {
-  road: 'alert',
-  drainage: 'droplet',
-  streetlight: 'bulb',
-  sidewalk: 'alert',
-};
-
 const NEAR_RADIUS = 1000;
 const WIDE_RADIUS = 3000;
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
+  const mapRef = useRef<InteractiveMapHandle>(null);
   const { reports } = useReports();
+
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState(false);
+  const [userCoords, setUserCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+
+  // Request GPS permission and center map on user's current location
+  useEffect(() => {
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return;
+
+      const loc = await Location.getCurrentPositionAsync({});
+      const coords = {
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+      };
+      setUserCoords(coords);
+      mapRef.current?.animateToCoords(coords, 0.015);
+    })();
+  }, []);
 
   const needle = query.trim().toLowerCase();
   const visible = reports.filter(
@@ -52,18 +65,22 @@ export default function MapScreen() {
 
   const openReport = (report: Report) => router.push(`/report/${report.id}`);
 
+  // Pan map to a report when tapped in the bottom sheet
+  const focusReportOnMap = (report: Report) => {
+    setExpanded(false);
+    mapRef.current?.animateToCoords(report.coords, 0.008);
+  };
+
   return (
     <View style={styles.screen}>
-      <MapBackdrop />
+      {/* Platform-Split Interactive Map (Native MapView on iOS/Android, MapBackdrop on Web) */}
+      <InteractiveMap
+        ref={mapRef}
+        reports={visible}
+        onSelectReport={openReport}
+      />
 
-      {visible.map((report) => (
-        <Marker key={report.id} report={report} onPress={() => openReport(report)} />
-      ))}
-
-      <View style={styles.userHalo} pointerEvents="none">
-        <View style={styles.userDot} />
-      </View>
-
+      {/* Top Search & Category Filter Chips */}
       <View style={[styles.top, { paddingTop: insets.top + 12 }]}>
         <View style={styles.searchRow}>
           <View style={styles.search}>
@@ -78,6 +95,18 @@ export default function MapScreen() {
               style={styles.searchInput}
             />
           </View>
+
+          {/* Recenter on GPS button */}
+          {userCoords && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Center on my location"
+              onPress={() => mapRef.current?.animateToCoords(userCoords, 0.015)}
+              style={styles.locateBtn}
+            >
+              <Icon name="pin" size={20} color={colors.primary} />
+            </Pressable>
+          )}
         </View>
 
         <ScrollView
@@ -104,6 +133,7 @@ export default function MapScreen() {
         </ScrollView>
       </View>
 
+      {/* Bottom Sheet */}
       <View style={[styles.sheet, expanded && styles.sheetExpanded]}>
         <Pressable
           accessibilityRole="button"
@@ -139,39 +169,13 @@ export default function MapScreen() {
                 }`}
                 photoTone={report.photoTone}
                 trailing={<StatusBadge status={report.status} />}
-                onPress={() => openReport(report)}
+                onPress={() => focusReportOnMap(report)}
               />
             ))
           )}
         </ScrollView>
       </View>
     </View>
-  );
-}
-
-function Marker({ report, onPress }: { report: Report; onPress: () => void }) {
-  const showCount = report.reportCount > 1;
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${report.title}, ${report.reportCount} reports`}
-      onPress={onPress}
-      style={[
-        styles.marker,
-        showCount ? styles.markerLarge : styles.markerSmall,
-        {
-          left: `${report.map.x * 100}%`,
-          top: `${report.map.y * 100}%`,
-          backgroundColor: categoryColors[report.category],
-        },
-      ]}
-    >
-      {showCount ? (
-        <Text style={styles.markerCount}>{report.reportCount}</Text>
-      ) : (
-        <Icon name={categoryIcons[report.category]} size={17} color={colors.onPrimary} />
-      )}
-    </Pressable>
   );
 }
 
@@ -188,6 +192,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     backgroundColor: colors.surface,
     borderRadius: radius.md,
+    ...shadow.card,
+  },
+  locateBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
     ...shadow.card,
   },
   searchInput: {
@@ -210,47 +223,6 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: colors.text, borderColor: colors.text },
   chipText: { fontFamily: fonts.medium, fontSize: 14.5, color: colors.text },
   chipTextActive: { color: colors.onPrimary, fontFamily: fonts.semibold },
-  marker: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: colors.surface,
-    ...shadow.raised,
-  },
-  markerLarge: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    transform: [{ translateX: -20 }, { translateY: -20 }],
-  },
-  markerSmall: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    transform: [{ translateX: -17 }, { translateY: -17 }],
-  },
-  markerCount: { fontFamily: fonts.bold, fontSize: 14, color: colors.onPrimary },
-  userHalo: {
-    position: 'absolute',
-    left: '42%',
-    top: '52.5%',
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(37, 99, 235, 0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transform: [{ translateX: -25 }, { translateY: -25 }],
-  },
-  userDot: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#2563EB',
-    borderWidth: 3,
-    borderColor: colors.surface,
-  },
   sheet: {
     position: 'absolute',
     left: 0,

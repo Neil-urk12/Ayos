@@ -3,6 +3,11 @@ import { colors } from '@/constants/design';
 export type Category = 'road' | 'drainage' | 'streetlight' | 'sidewalk';
 export type ReportStatus = 'received' | 'verified' | 'in_progress' | 'resolved';
 
+export type MapCoords = {
+  latitude: number;
+  longitude: number;
+};
+
 export type Report = {
   id: string;
   title: string;
@@ -28,8 +33,10 @@ export type Report = {
   danger?: boolean;
   description?: string;
   photoTone: string;
-  /** Position on the neighbourhood map, as fractions of its width and height. */
+  /** Position on the neighbourhood map backdrop (web fallback), as fractions of width and height. */
   map: { x: number; y: number };
+  /** Geographic coordinates for native map rendering and GPS distance checks. */
+  coords: MapCoords;
 };
 
 export type ReportDraft = {
@@ -78,6 +85,7 @@ export const seedReports: Report[] = [
     danger: true,
     photoTone: colors.photo,
     map: { x: 0.49, y: 0.24 },
+    coords: { latitude: 10.3264, longitude: 123.8981 },
   },
   {
     id: 'AY-01467',
@@ -95,6 +103,7 @@ export const seedReports: Report[] = [
     verifiedAt: 'Nov 12, 3:20 PM',
     photoTone: colors.photoAlt,
     map: { x: 0.65, y: 0.47 },
+    coords: { latitude: 10.3242, longitude: 123.9016 },
   },
   {
     id: 'AY-01455',
@@ -111,6 +120,7 @@ export const seedReports: Report[] = [
     receivedAt: 'Nov 10, 5:12 PM',
     photoTone: colors.photoWarm,
     map: { x: 0.12, y: 0.62 },
+    coords: { latitude: 10.3189, longitude: 123.9114 },
   },
   {
     id: 'AY-01431',
@@ -131,6 +141,7 @@ export const seedReports: Report[] = [
     awaitingConfirmation: true,
     photoTone: colors.photoAlt,
     map: { x: 0.82, y: 0.3 },
+    coords: { latitude: 10.3176, longitude: 123.8907 },
   },
   {
     id: 'AY-01398',
@@ -150,6 +161,7 @@ export const seedReports: Report[] = [
     resolvedOn: 'Nov 8',
     photoTone: colors.photo,
     map: { x: 0.9, y: 0.86 },
+    coords: { latitude: 10.3141, longitude: 123.8965 },
   },
   {
     id: 'AY-01377',
@@ -169,6 +181,7 @@ export const seedReports: Report[] = [
     resolvedOn: 'Nov 3',
     photoTone: colors.photoAlt,
     map: { x: 0.05, y: 0.9 },
+    coords: { latitude: 10.3078, longitude: 123.9042 },
   },
   {
     id: 'AY-01350',
@@ -188,6 +201,7 @@ export const seedReports: Report[] = [
     resolvedOn: 'Oct 29',
     photoTone: colors.photoWarm,
     map: { x: 0.95, y: 0.95 },
+    coords: { latitude: 10.3012, longitude: 123.8968 },
   },
   {
     id: 'AY-01462',
@@ -204,6 +218,7 @@ export const seedReports: Report[] = [
     receivedAt: 'Nov 16, 8:47 PM',
     photoTone: colors.photoAlt,
     map: { x: 0.81, y: 0.3 },
+    coords: { latitude: 10.3255, longitude: 123.9034 },
   },
   {
     id: 'AY-01459',
@@ -220,6 +235,7 @@ export const seedReports: Report[] = [
     receivedAt: 'Nov 14, 2:16 PM',
     photoTone: colors.photoAlt,
     map: { x: 0.28, y: 0.37 },
+    coords: { latitude: 10.3194, longitude: 123.8938 },
   },
   {
     id: 'AY-01290',
@@ -239,6 +255,7 @@ export const seedReports: Report[] = [
     resolvedOn: 'Nov 2',
     photoTone: colors.photoAlt,
     map: { x: 0.4, y: 0.7 },
+    coords: { latitude: 10.3271, longitude: 123.8975 },
   },
 ];
 
@@ -247,12 +264,27 @@ export const draftLocation = {
   street: 'Gorordo Ave',
   area: 'Lahug',
   accuracy: 8,
+  coords: { latitude: 10.3265, longitude: 123.898 } satisfies MapCoords,
   /** Distances from the draft pin to nearby reports, in metres. */
   nearby: { 'AY-01482': 14, 'AY-01290': 48 } as Record<string, number>,
 };
 
 export function othersCount(report: Report) {
   return report.mine ? report.reportCount - 1 : report.reportCount;
+}
+
+/** Returns great-circle distance between two coordinates, in metres. */
+export function distanceBetweenCoords(a: MapCoords, b: MapCoords): number {
+  const earthRadius = 6371000;
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(b.latitude - a.latitude);
+  const dLng = toRad(b.longitude - a.longitude);
+  const sinLat = Math.sin(dLat / 2);
+  const sinLng = Math.sin(dLng / 2);
+  const h =
+    sinLat * sinLat +
+    Math.cos(toRad(a.latitude)) * Math.cos(toRad(b.latitude)) * sinLng * sinLng;
+  return 2 * earthRadius * Math.asin(Math.sqrt(h));
 }
 
 export function formatDistance(metres: number) {
