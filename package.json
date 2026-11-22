@@ -1,7 +1,6 @@
 {
   "name": "ayos-monorepo",
   "private": true,
-  "packageManager": "pnpm@12.14.0",
   "scripts": {
     "mobile": "pnpm --filter mobile start",
     "web": "pnpm --filter web dev",
@@ -12,5 +11,6 @@
   "devDependencies": {
     "oxfmt": "^0.78.0",
     "oxlint": "^1.93.0"
-  }
+  },
+  "packageManager": "pnpm@12.14.0"
 }

@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
 
-import { colors } from '@/constants/design';
+import { colors } from '../constants/design';
 import {
   categoryLabels,
   draftLocation,
@@ -9,7 +9,7 @@ import {
   seedReports,
   type Report,
   type ReportDraft,
-} from '@/data/reports';
+} from './reports';
 
 export type SimilarReport = { report: Report; distance: number };
 

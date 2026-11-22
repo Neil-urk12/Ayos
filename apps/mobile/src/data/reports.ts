@@ -1,4 +1,4 @@
-import { colors } from '@/constants/design';
+import { colors } from '../constants/design';
 
 export type Category = 'road' | 'drainage' | 'streetlight' | 'sidewalk';
 export type ReportStatus = 'received' | 'verified' | 'in_progress' | 'resolved';

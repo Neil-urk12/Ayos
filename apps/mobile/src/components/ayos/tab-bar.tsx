@@ -3,8 +3,8 @@ import type { BottomTabBarProps } from 'expo-router/js-tabs';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, type IconName } from '@/components/ayos/icon';
-import { colors, fonts, shadow } from '@/constants/design';
+import { Icon, type IconName } from './icon';
+import { colors, fonts, shadow } from '../../constants/design';
 
 const tabs: Record<string, { label: string; icon: IconName }> = {
   map: { label: 'Map', icon: 'map' },

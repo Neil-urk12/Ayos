@@ -3,8 +3,8 @@ import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon } from '@/components/ayos/icon';
-import { colors, fonts, type } from '@/constants/design';
+import { Icon } from './icon';
+import { colors, fonts, type } from '../../constants/design';
 
 type ScreenHeaderProps = {
   title: string;

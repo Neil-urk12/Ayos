@@ -1,5 +1,5 @@
-import { Link, router } from 'expo-router';
-import { useState } from 'react';
+import { Link, useLocalSearchParams } from 'expo-router';
+import { useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -7,14 +7,19 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
+  type TextInputInstance,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button } from '@/components/ayos/button';
-import { Icon, type IconName } from '@/components/ayos/icon';
-import { colors, fonts, radius, type } from '@/constants/design';
+import { Button } from '../components/ayos/button';
+import { FormMessage } from '../components/ayos/form-message';
+import { Icon, type IconName } from '../components/ayos/icon';
+import { TextField } from '../components/ayos/text-field';
+import { colors, fonts, radius, type } from '../constants/design';
+import { useAuth } from '../data/auth-store';
+import { authErrorMessage } from '../lib/firebase/auth-errors';
+import { validateEmail } from '../lib/validation';
 
 type Language = 'en' | 'ceb';
 
@@ -24,12 +29,103 @@ const features: { icon: IconName; label: string }[] = [
   { icon: 'check-circle', label: 'Track the fix' },
 ];
 
-export default function SignInScreen() {
-  const [language, setLanguage] = useState<Language>('en');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+type SignInParams = { email?: string; created?: string };
 
-  const signIn = () => router.replace('/map');
+export default function SignInRoute() {
+  const { email = '', created } = useLocalSearchParams<SignInParams>();
+  // Keyed on the params so arriving from create-account always resets the form,
+  // even if this screen was already open underneath it.
+  return (
+    <SignInScreen
+      key={`${created ?? ''}:${email}`}
+      initialEmail={email}
+      accountCreated={created === '1'}
+    />
+  );
+}
+
+function SignInScreen({
+  initialEmail,
+  accountCreated,
+}: {
+  initialEmail: string;
+  accountCreated: boolean;
+}) {
+  const [language, setLanguage] = useState<Language>('en');
+  const [email, setEmail] = useState(initialEmail);
+  const [password, setPassword] = useState('');
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [message, setMessage] = useState<{
+    tone: 'error' | 'success';
+    text: string;
+  } | null>(
+    accountCreated
+      ? {
+          tone: 'success',
+          text: 'Account created. Sign in with your email and password.',
+        }
+      : null,
+  );
+  const [busy, setBusy] = useState<'signIn' | 'guest' | 'reset' | null>(null);
+  const passwordRef = useRef<TextInputInstance>(null);
+  const { signIn, signInAsGuest, resetPassword } = useAuth();
+
+  // On success the route guard in _layout.tsx moves the user to the map.
+  const submit = async () => {
+    if (busy) return;
+    const next = {
+      email: validateEmail(email),
+      password: password ? undefined : 'Enter your password.',
+    };
+    setErrors(next);
+    setMessage(null);
+    if (next.email || next.password) return;
+
+    setBusy('signIn');
+    try {
+      await signIn(email, password);
+    } catch (error) {
+      setMessage({ tone: 'error', text: authErrorMessage(error) });
+      setBusy(null);
+    }
+  };
+
+  // Firebase anonymous sign-in; the route guard then moves the guest to the map.
+  const continueAsGuest = async () => {
+    if (busy) return;
+    setErrors({});
+    setMessage(null);
+    setBusy('guest');
+    try {
+      await signInAsGuest();
+    } catch (error) {
+      setMessage({ tone: 'error', text: authErrorMessage(error) });
+      setBusy(null);
+    }
+  };
+
+  const forgotPassword = async () => {
+    if (busy) return;
+    const emailError = validateEmail(email);
+    setErrors({
+      email: emailError && 'Enter your email above, then tap “Forgot password?”.',
+    });
+    setMessage(null);
+    if (emailError) return;
+
+    setBusy('reset');
+    try {
+      await resetPassword(email);
+      setMessage({
+        tone: 'success',
+        text: `If an account exists for ${email.trim()}, we sent a link to reset your password.`,
+      });
+    } catch (error) {
+      setMessage({ tone: 'error', text: authErrorMessage(error) });
+    } finally {
+      setBusy(null);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
@@ -89,56 +185,70 @@ export default function SignInScreen() {
           </View>
 
           <View style={styles.form}>
-            <Text style={styles.label} nativeID="email-label">
-              Email
-            </Text>
-            <TextInput
-              accessibilityLabelledBy="email-label"
+            <TextField
+              label="Email"
               value={email}
               onChangeText={setEmail}
+              error={errors.email}
               placeholder="you@example.com"
-              placeholderTextColor={colors.placeholder}
               autoCapitalize="none"
+              autoCorrect={false}
               autoComplete="email"
               keyboardType="email-address"
               textContentType="emailAddress"
               returnKeyType="next"
-              style={styles.input}
+              submitBehavior="submit"
+              onSubmitEditing={() => passwordRef.current?.focus()}
             />
 
-            <Text style={[styles.label, styles.labelSpaced]} nativeID="password-label">
-              Password
-            </Text>
-            <TextInput
-              accessibilityLabelledBy="password-label"
+            <TextField
+              ref={passwordRef}
+              autoFocus={accountCreated}
+              label="Password"
               value={password}
               onChangeText={setPassword}
+              error={errors.password}
               placeholder="••••••••"
-              placeholderTextColor={colors.placeholder}
               secureTextEntry
               autoComplete="current-password"
               textContentType="password"
               returnKeyType="go"
-              onSubmitEditing={signIn}
-              style={styles.input}
+              onSubmitEditing={submit}
+              containerStyle={styles.fieldSpaced}
             />
 
-            <Button label="Sign in" onPress={signIn} style={styles.signIn} />
+            {message ? <FormMessage tone={message.tone} text={message.text} /> : null}
+
+            <Button
+              label={busy === 'signIn' ? 'Signing in…' : 'Sign in'}
+              onPress={submit}
+              disabled={busy !== null}
+              style={styles.signIn}
+            />
 
             <Pressable
               accessibilityRole="button"
-              onPress={signIn}
+              accessibilityState={{ disabled: busy !== null }}
+              disabled={busy !== null}
+              onPress={continueAsGuest}
               style={({ pressed }) => [styles.guestButton, pressed && styles.guestButtonPressed]}
             >
-              <Text style={styles.guestButtonText}>Sign in as guest</Text>
+              <Text style={styles.guestButtonText}>
+                {busy === 'guest' ? 'Signing in…' : 'Sign in as guest'}
+              </Text>
             </Pressable>
 
             <View style={styles.links}>
               <Link href="/create-account" style={styles.link}>
                 Create an account
               </Link>
-              <Text style={styles.link} accessibilityRole="link">
-                Forgot password?
+              <Text
+                style={styles.link}
+                accessibilityRole="link"
+                accessibilityState={{ disabled: busy !== null }}
+                onPress={forgotPassword}
+              >
+                {busy === 'reset' ? 'Sending…' : 'Forgot password?'}
               </Text>
             </View>
           </View>
@@ -207,7 +317,11 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 1,
   },
-  languageText: { fontFamily: fonts.semibold, fontSize: 13, color: colors.textMuted },
+  languageText: {
+    fontFamily: fonts.semibold,
+    fontSize: 13,
+    color: colors.textMuted,
+  },
   languageTextActive: { color: colors.text },
   headline: { ...type.hero, marginBottom: 14 },
   lede: {
@@ -230,27 +344,15 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
     gap: 10,
   },
-  featureLabel: { fontFamily: fonts.semibold, fontSize: 14, lineHeight: 18, color: colors.text },
-  form: { marginBottom: 32 },
-  label: { ...type.label, fontSize: 15, marginBottom: 8 },
-  labelSpaced: { marginTop: 18 },
-  input: {
-    height: 50,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    borderRadius: radius.md,
-    paddingHorizontal: 15,
-    fontFamily: fonts.regular,
-    fontSize: 16,
+  featureLabel: {
+    fontFamily: fonts.semibold,
+    fontSize: 14,
+    lineHeight: 18,
     color: colors.text,
   },
+  form: { marginBottom: 32 },
+  fieldSpaced: { marginTop: 18 },
   signIn: { marginTop: 14 },
-  links: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 18,
-  },
   guestButton: {
     height: 50,
     backgroundColor: colors.surface,
@@ -269,12 +371,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.primary,
   },
+  links: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 18,
+  },
   link: {
     fontFamily: fonts.medium,
     fontSize: 15,
     color: colors.primary,
     textDecorationLine: 'underline',
   },
-  privacy: { ...type.small, fontSize: 13, color: colors.textSecondary, marginTop: 'auto' },
+  privacy: {
+    ...type.small,
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 'auto',
+  },
   privacyLink: { color: colors.primary, textDecorationLine: 'underline' },
 });
