@@ -8,13 +8,16 @@ import { ScreenHeader } from '../components/ayos/screen-header';
 import { StatusBadge } from '../components/ayos/status-badge';
 import { colors, fonts, radius, type } from '../constants/design';
 import { formatDistance, othersCount, statusLabels } from '../data/reports';
+import { useAuth } from '../data/auth-store';
 import { useReports } from '../data/reports-store';
 
 export default function DuplicateCheckScreen() {
   const insets = useSafeAreaInsets();
   const { draft, findSimilar, joinExisting, submitNew } = useReports();
+  const { isGuest } = useAuth();
 
-  if (!draft) {
+  // A draft can outlive the account that wrote it; create-report shows guests why they can't report.
+  if (!draft || isGuest) {
     return <Redirect href="/create-report" />;
   }
 

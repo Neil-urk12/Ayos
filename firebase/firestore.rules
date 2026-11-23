@@ -27,8 +27,34 @@ service cloud.firestore {
       return /databases/$(database)/documents/reports/$(reportId);
     }
 
+    // Guests (anonymous auth) can browse reports but can't file, join or confirm them.
+    function isResident() {
+      return signedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
     function validName(value) {
       return value is string && value.size() > 0 && value.size() <= 100;
+    }
+
+    function validText(value, max) {
+      return value is string && value.size() <= max;
+    }
+
+    // Field set and types for a new report, matching submitNew in reports-store.tsx.
+    function validNewReport(data) {
+      let fields = ['reporterId', 'title', 'category', 'street', 'area', 'reportCount', 'status',
+        'reportedOn', 'receivedAt', 'danger', 'description', 'photoTone', 'map'];
+      return data.keys().hasAll(fields) && data.keys().hasOnly(fields)
+        && validText(data.title, 200) && data.title.size() > 0
+        && data.category in ['road', 'drainage', 'streetlight', 'sidewalk']
+        && validName(data.street)
+        && validName(data.area)
+        && validText(data.reportedOn, 50)
+        && validText(data.receivedAt, 50)
+        && data.danger is bool
+        && validText(data.description, 2000)
+        && validText(data.photoTone, 50)
+        && data.map is map && data.map.x is number && data.map.y is number;
     }
 
     // A user's own profile, written at sign-up by src/lib/firebase/users.ts.
@@ -65,10 +91,8 @@ service cloud.firestore {
       // New reports start as 'received' with the reporter as the only supporter, created
       // in the same batch as their supporters/{uid} doc. Staff-only fields (statusNote,
       // assignedTo, verifiedAt, resolvedOn, awaitingConfirmation) can't be set here.
-      allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['reporterId', 'title', 'category', 'street',
-          'area', 'reportCount', 'status', 'reportedOn', 'receivedAt', 'danger', 'description',
-          'photoTone', 'map'])
+      allow create: if isResident()
+        && validNewReport(request.resource.data)
         && request.resource.data.reporterId == request.auth.uid
         && request.resource.data.status == 'received'
         && request.resource.data.reportCount == 1
@@ -78,10 +102,12 @@ service cloud.firestore {
         // Staff manage status, notes and assignment.
         isStaff()
         // The reporter may edit their own text. reporterId, status and counts stay locked.
-        || (isOwner(resource.data.reporterId) && changedOnly(['description', 'danger']))
+        || (isOwner(resource.data.reporterId) && changedOnly(['description', 'danger'])
+          && validText(request.resource.data.description, 2000)
+          && request.resource.data.danger is bool)
         // Joining: bump reportCount by exactly 1 in the same batch that creates your
         // supporters/{uid} doc, so each person counts once.
-        || (signedIn()
+        || (isResident()
           && changedOnly(['reportCount'])
           && request.resource.data.reportCount == resource.data.reportCount + 1
           && !exists(supporterPath(reportId))
@@ -110,7 +136,7 @@ service cloud.firestore {
         // Only alongside the write that earns it: creating the report as its reporter, or
         // joining (reportCount + 1 in the same batch). A bare supporter doc would grant
         // confirm-fix rights without joining.
-        allow create: if isOwner(uid)
+        allow create: if isOwner(uid) && isResident()
           && ((!exists(reportPath(reportId)) && getAfter(reportPath(reportId)).data.reporterId == uid)
             || getAfter(reportPath(reportId)).data.reportCount
               == get(reportPath(reportId)).data.reportCount + 1);

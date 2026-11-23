@@ -25,6 +25,7 @@ import {
   type Category,
   type ReportDraft,
 } from '../data/reports';
+import { useAuth } from '../data/auth-store';
 import { useReports } from '../data/reports-store';
 
 const MAX_PHOTOS = 3;
@@ -32,6 +33,7 @@ const MAX_PHOTOS = 3;
 export default function CreateReportScreen() {
   const insets = useSafeAreaInsets();
   const { saveDraft, findSimilar, submitNew } = useReports();
+  const { isGuest } = useAuth();
 
   const [photos, setPhotos] = useState<string[]>(() => [formatTime(new Date())]);
   const [category, setCategory] = useState<Category | null>(null);
@@ -39,6 +41,22 @@ export default function CreateReportScreen() {
   const [danger, setDanger] = useState(false);
 
   const canSend = photos.length > 0 && category !== null;
+
+  // firebase/firestore.rules refuses report writes from guests, so say so up front.
+  if (isGuest) {
+    return (
+      <View style={styles.screen}>
+        <ScreenHeader title="New report" />
+        <View style={styles.guest}>
+          <Icon name="user" size={26} color={colors.primary} />
+          <Text style={styles.guestText} accessibilityRole="alert">
+            Guests can browse reports but can’t send or join one. To report a problem, sign out
+            and create an account.
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   const send = () => {
     if (!category) return;
@@ -205,6 +223,8 @@ const PHOTO_HEIGHT = 112;
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
+  guest: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 14 },
+  guestText: { ...type.body, color: colors.textSecondary, textAlign: 'center', maxWidth: 280 },
   content: { padding: 16, paddingTop: 20, gap: 26 },
   field: { gap: 10 },
   label: { ...type.label, fontSize: 16 },
