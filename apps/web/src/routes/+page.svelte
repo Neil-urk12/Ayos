@@ -29,14 +29,14 @@
 	<div class="controls">
 		<select bind:value={queue.selectedCategory} aria-label="Filter by category" class="select">
 			<option value="ALL">All categories</option>
-			{#each queue.categories as category}
+			{#each queue.categories as category (category)}
 				<option value={category}>{category}</option>
 			{/each}
 		</select>
 
 		<select bind:value={queue.selectedBarangay} aria-label="Filter by barangay" class="select">
 			<option value="ALL">All barangays</option>
-			{#each queue.barangays as barangay}
+			{#each queue.barangays as barangay (barangay)}
 				<option value={barangay}>{barangay}</option>
 			{/each}
 		</select>
@@ -87,7 +87,7 @@
 				</tr>
 			</thead>
 			<tbody>
-				{#each queue.filteredItems as item, index}
+				{#each queue.filteredItems as item, index (item.id)}
 					<tr class="clickable-row" onclick={() => queue.openIssue(item.id)}>
 						<td class="col-rank muted">{index + 1}</td>
 						<td>

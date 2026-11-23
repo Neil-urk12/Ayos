@@ -44,7 +44,7 @@
 		<section class="panel" aria-label="Photos from all reports">
 			<h2>Photos from all reports</h2>
 			<div class="photo-grid">
-				{#each Array(issue.photoCount) as _, i}
+				{#each { length: issue.photoCount }, i (i)}
 					<div class="photo-tile" title="Report photo #{i + 1}"></div>
 				{/each}
 			</div>
