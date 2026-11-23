@@ -89,7 +89,9 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
           : {
               awaitingConfirmation: false,
               status: 'in_progress',
+              // Must match firebase/firestore.rules (reopen branch) exactly, or the write is denied.
               statusNote: 'Reopened after you said it is still broken',
+              // shortcut: in-memory only; the Firestore write must use deleteField(), the rules reject null/undefined.
               resolvedOn: undefined,
             },
       ),

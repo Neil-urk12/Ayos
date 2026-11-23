@@ -23,6 +23,10 @@ service cloud.firestore {
       return /databases/$(database)/documents/reports/$(reportId)/supporters/$(request.auth.uid);
     }
 
+    function reportPath(reportId) {
+      return /databases/$(database)/documents/reports/$(reportId);
+    }
+
     function validName(value) {
       return value is string && value.size() > 0 && value.size() <= 100;
     }
@@ -58,11 +62,17 @@ service cloud.firestore {
       // Reports are public to signed-in residents.
       allow read: if signedIn();
 
-      // New reports start as 'received' with the reporter as the only supporter.
+      // New reports start as 'received' with the reporter as the only supporter, created
+      // in the same batch as their supporters/{uid} doc. Staff-only fields (statusNote,
+      // assignedTo, verifiedAt, resolvedOn, awaitingConfirmation) can't be set here.
       allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['reporterId', 'title', 'category', 'street',
+          'area', 'reportCount', 'status', 'reportedOn', 'receivedAt', 'danger', 'description',
+          'photoTone', 'map'])
         && request.resource.data.reporterId == request.auth.uid
         && request.resource.data.status == 'received'
-        && request.resource.data.reportCount == 1;
+        && request.resource.data.reportCount == 1
+        && existsAfter(supporterPath(reportId));
 
       allow update: if
         // Staff manage status, notes and assignment.
@@ -76,14 +86,20 @@ service cloud.firestore {
           && request.resource.data.reportCount == resource.data.reportCount + 1
           && !exists(supporterPath(reportId))
           && existsAfter(supporterPath(reportId)))
-        // Confirming a fix: the reporter or a supporter answers a resolved report,
-        // either accepting it or reopening it as in_progress.
+        // Confirming a fix: the reporter or a supporter answers a resolved report.
         || ((isOwner(resource.data.reporterId) || exists(supporterPath(reportId)))
           && resource.data.status == 'resolved'
           && resource.data.awaitingConfirmation == true
-          && changedOnly(['awaitingConfirmation', 'status', 'statusNote', 'resolvedOn'])
           && request.resource.data.awaitingConfirmation == false
-          && request.resource.data.status in ['resolved', 'in_progress']);
+          && (
+            // Accepting the fix changes nothing else.
+            changedOnly(['awaitingConfirmation'])
+            // Reopening sets the fixed note from reports-store.tsx confirmFix and clears
+            // resolvedOn, so residents can't write their own text over the staff note.
+            || (changedOnly(['awaitingConfirmation', 'status', 'statusNote', 'resolvedOn'])
+              && request.resource.data.status == 'in_progress'
+              && request.resource.data.statusNote == 'Reopened after you said it is still broken'
+              && !('resolvedOn' in request.resource.data))));
 
       allow delete: if isStaff()
         || (isOwner(resource.data.reporterId) && resource.data.status == 'received');
@@ -91,8 +107,15 @@ service cloud.firestore {
       // reports/{reportId}/supporters/{uid}: one doc per resident who joined the report.
       match /supporters/{uid} {
         allow read: if signedIn();
-        allow create: if isOwner(uid);
-        allow delete: if isOwner(uid) || isStaff();
+        // Only alongside the write that earns it: creating the report as its reporter, or
+        // joining (reportCount + 1 in the same batch). A bare supporter doc would grant
+        // confirm-fix rights without joining.
+        allow create: if isOwner(uid)
+          && ((!exists(reportPath(reportId)) && getAfter(reportPath(reportId)).data.reporterId == uid)
+            || getAfter(reportPath(reportId)).data.reportCount
+              == get(reportPath(reportId)).data.reportCount + 1);
+        // Staff only: a self-delete would let the same person join (and count) again.
+        allow delete: if isStaff();
       }
     }
 
