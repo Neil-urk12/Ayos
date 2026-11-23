@@ -33,6 +33,8 @@ type AuthContextValue = {
   isGuest: boolean;
   /** The users/{uid} Firestore document; null while loading or if it doesn't exist. */
   profile: UserProfile | null;
+  /** True once the profile request has answered for this user, even with no document or an error. */
+  profileLoaded: boolean;
   /** True until Firebase has restored (or ruled out) a saved session. */
   initializing: boolean;
   signIn: (email: string, password: string) => Promise<void>;
@@ -65,7 +67,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     uid: string;
     data: UserProfile | null;
   } | null>(null);
-  const profile = user && loadedProfile?.uid === user.uid ? loadedProfile.data : null;
+  const profileLoaded = user !== null && loadedProfile?.uid === user.uid;
+  const profile = profileLoaded ? loadedProfile.data : null;
   const [initializing, setInitializing] = useState(true);
   const [signingUp, setSigningUp] = useState(false);
 
@@ -85,7 +88,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return watchUserProfile(
       uid,
       (data) => setLoadedProfile({ uid, data }),
-      (error) => console.warn('[auth] Could not load profile:', error.message),
+      (error) => {
+        console.warn('[auth] Could not load profile:', error.message);
+        setLoadedProfile({ uid, data: null });
+      },
     );
   }, [user]);
 
@@ -94,6 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signedIn: user !== null && !signingUp,
     isGuest: user?.isAnonymous ?? false,
     profile,
+    profileLoaded,
     initializing,
     signIn: async (email, password) => {
       await signInWithEmailAndPassword(auth, email.trim(), password);

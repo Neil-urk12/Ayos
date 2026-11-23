@@ -8,7 +8,7 @@ import { colors, radius, type } from '../../constants/design';
 import { useAuth } from '../../data/auth-store';
 
 export default function ProfileScreen() {
-  const { user, profile, isGuest, signOut } = useAuth();
+  const { user, profile, profileLoaded, isGuest, signOut } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
 
   // The route guard in _layout.tsx returns the user to sign in once this resolves.
@@ -54,7 +54,9 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.identityText}>
               <Text style={styles.name}>Guest</Text>
-              <Text style={type.meta}>Create an account to keep your reports.</Text>
+              <Text style={type.meta}>
+                You’re browsing as a guest. To create an account, sign out first.
+              </Text>
             </View>
           </View>
         ) : profile ? (
@@ -82,10 +84,19 @@ export default function ProfileScreen() {
               ))}
             </View>
           </>
-        ) : (
+        ) : !profileLoaded ? (
           <View style={styles.loading}>
             <ActivityIndicator color={colors.primary} />
             <Text style={type.meta}>Loading your profile…</Text>
+          </View>
+        ) : (
+          // No users/{uid} doc, or the read failed (e.g. rules not deployed).
+          <View style={styles.loading}>
+            <Icon name="user" size={26} color={colors.primary} />
+            <Text style={type.meta} accessibilityRole="alert">
+              We couldn’t load your profile. Sign out and sign in again. If it keeps happening,
+              contact support.
+            </Text>
           </View>
         )}
 
