@@ -50,8 +50,8 @@ export default function CreateReportScreen() {
         <View style={styles.guest}>
           <Icon name="user" size={26} color={colors.primary} />
           <Text style={styles.guestText} accessibilityRole="alert">
-            Guests can browse reports but can’t send or join one. To report a problem, sign out
-            and create an account.
+            Guests can browse reports but can’t send or join one. To report a problem, sign out and
+            create an account.
           </Text>
         </View>
       </View>
