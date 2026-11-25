@@ -1,4 +1,29 @@
-export type IssueStatus = 'In progress' | 'Verified' | 'Received';
+import {
+	arrayUnion,
+	deleteField,
+	increment,
+	serverTimestamp,
+	updateDoc,
+	writeBatch
+} from 'firebase/firestore';
+
+import { db } from '#lib/firebase.ts';
+import { staff } from './auth.svelte.ts';
+import {
+	categoryLabels,
+	DAY_MS,
+	formatDay,
+	formatDayTime,
+	reportRef,
+	reports,
+	statusLabels,
+	suggestionRef,
+	type ReportDoc,
+	type StatusCode
+} from './reports.svelte.ts';
+import { settings } from './settings.svelte.ts';
+
+export type IssueStatus = 'In progress' | 'Verified' | 'Received' | 'Resolved';
 
 export interface GroupReportItem {
 	id: string;
@@ -10,7 +35,8 @@ export interface GroupReportItem {
 }
 
 export interface IssueGroup {
-	id: number;
+	/** The group's lead report id (reports/{id}); merged reports point at it via mergedInto. */
+	id: string;
 	groupCode: string;
 	title: string;
 	category: string;
@@ -29,326 +55,121 @@ export interface IssueGroup {
 	reportItems: GroupReportItem[];
 }
 
-const INITIAL_ISSUES: IssueGroup[] = [
-	{
-		id: 1,
-		groupCode: 'G-0317',
-		title: 'Deep pothole, northbound lane',
-		category: 'Road damage',
-		street: 'Gorordo Ave',
-		barangay: 'Lahug',
-		firstReportedLabel: 'first reported Nov 6 (9 days ago)',
-		reports: 6,
-		ageDays: 9,
-		score: 88,
-		status: 'In progress',
-		photoCount: 6,
-		severityScore: 4,
-		severitySelect: '4 · Major: affects traffic',
-		safetyImpact: 'High',
-		residentUpdate: 'Repair crew scheduled for Nov 18. Please keep to the inner lane.',
+const statusCodes: Record<IssueStatus, StatusCode> = {
+	Received: 'received',
+	Verified: 'verified',
+	'In progress': 'in_progress',
+	Resolved: 'resolved'
+};
+
+/** The staff severity dropdown's options, by severity. */
+const severityOptions: Record<number, string> = {
+	4: '4 · Major: affects traffic',
+	3: '3 · Moderate: night visibility',
+	2: '2 · Minor: pedestrian detour',
+	1: '1 · Low: intermittent'
+};
+
+/** Used until staff set a severity on the issue page. */
+const DEFAULT_SEVERITY = 2;
+
+/** Bar fill (0–1) for each safety impact level; also its contribution to the score. */
+const safetyFill: Record<string, number> = { High: 0.9, Medium: 0.6, Low: 0.35 };
+
+/**
+ * Priority score, 0–100, with the weights from settings/priority. Same bars as the
+ * breakdown on the issue page.
+ */
+function priorityScore(severity: number, safetyImpact: string, ageDays: number, count: number) {
+	const w = settings.current.weights;
+	return Math.round(
+		100 *
+			(w.severity * (severity / 5) +
+				w.safety * safetyFill[safetyImpact] +
+				w.age * Math.min(1, ageDays * 0.07) +
+				w.reports * Math.min(1, count * 0.15))
+	);
+}
+
+function buildGroup(lead: ReportDoc, drafts: Record<string, string>, now: number): IssueGroup {
+	const children = reports.childrenOf(lead.id);
+	const members = [lead, ...children];
+	const firstMs = Math.min(...members.map((m) => m.createdAt.getTime()));
+	const ageDays = Math.max(0, Math.floor((now - firstMs) / DAY_MS));
+	const severity = lead.severity ?? DEFAULT_SEVERITY;
+	const safetyImpact = members.some((m) => m.danger) ? 'High' : 'Medium';
+	// reportCount on the lead already includes merged reports (added on merge).
+	const count = lead.reportCount;
+	const ageLabel = ageDays === 0 ? 'today' : `${ageDays} ${ageDays === 1 ? 'day' : 'days'} ago`;
+
+	return {
+		id: lead.id,
+		groupCode: lead.id,
+		title: lead.title,
+		category: categoryLabels[lead.category] ?? lead.category,
+		street: lead.street,
+		barangay: lead.area,
+		firstReportedLabel: `first reported ${formatDay(new Date(firstMs))} (${ageLabel})`,
+		reports: count,
+		ageDays,
+		score: priorityScore(severity, safetyImpact, ageDays, count),
+		status: statusLabels[lead.status] as IssueStatus,
+		photoCount: members.length,
+		severityScore: severity,
+		severitySelect: severityOptions[severity] ?? severityOptions[DEFAULT_SEVERITY],
+		safetyImpact,
+		residentUpdate: drafts[lead.id] ?? lead.statusNote ?? '',
 		reportItems: [
 			{
-				id: 'r1',
-				code: 'AY-01391',
-				submitted: 'Nov 6, 7:12 AM',
+				id: lead.id,
+				code: lead.id,
+				submitted: lead.receivedAt,
 				matchScore: 'First report',
 				mergedBy: '—',
 				canUnmerge: false
 			},
-			{
-				id: 'r2',
-				code: 'AY-01398',
-				submitted: 'Nov 6, 5:40 PM',
-				matchScore: '0.92',
-				mergedBy: 'Engr. [NAME]',
+			...children.map((child) => ({
+				id: child.id,
+				code: child.id,
+				submitted: child.receivedAt,
+				matchScore: child.mergeScore ?? '—',
+				mergedBy: child.mergedBy ?? '—',
 				canUnmerge: true
-			},
-			{
-				id: 'r3',
-				code: 'AY-01420',
-				submitted: 'Nov 8, 8:05 AM',
-				matchScore: '0.84',
-				mergedBy: 'Engr. [NAME]',
-				canUnmerge: true
-			},
-			{
-				id: 'r4',
-				code: 'AY-01433',
-				submitted: 'Nov 9, 6:30 PM',
-				matchScore: '0.79',
-				mergedBy: 'Staff [NAME]',
-				canUnmerge: true
-			},
-			{
-				id: 'r5',
-				code: 'AY-01451',
-				submitted: 'Nov 13, 9:15 AM',
-				matchScore: '0.90',
-				mergedBy: 'Staff [NAME]',
-				canUnmerge: true
-			},
-			{
-				id: 'r6',
-				code: 'AY-01482',
-				submitted: 'Nov 15, 9:43 AM',
-				matchScore: '0.88',
-				mergedBy: 'Engr. [NAME]',
-				canUnmerge: true
-			}
+			}))
 		]
-	},
-	{
-		id: 2,
-		groupCode: 'G-0294',
-		title: 'Open manhole, no cover',
-		category: 'Drainage',
-		street: 'Colon St',
-		barangay: 'Sto. Niño',
-		firstReportedLabel: 'first reported Nov 14 (1 day ago)',
-		reports: 4,
-		ageDays: 1,
-		score: 84,
-		status: 'Verified',
-		photoCount: 4,
-		severityScore: 4,
-		severitySelect: '4 · Major: affects traffic',
-		safetyImpact: 'High',
-		residentUpdate: 'Barricade placed on site; replacement cover ordered.',
-		reportItems: [
-			{
-				id: 'r21',
-				code: 'AY-01460',
-				submitted: 'Nov 14, 8:20 AM',
-				matchScore: 'First report',
-				mergedBy: '—',
-				canUnmerge: false
-			},
-			{
-				id: 'r22',
-				code: 'AY-01465',
-				submitted: 'Nov 14, 1:15 PM',
-				matchScore: '0.89',
-				mergedBy: 'Engr. [NAME]',
-				canUnmerge: true
-			},
-			{
-				id: 'r23',
-				code: 'AY-01471',
-				submitted: 'Nov 14, 6:50 PM',
-				matchScore: '0.85',
-				mergedBy: 'Staff [NAME]',
-				canUnmerge: true
-			},
-			{
-				id: 'r24',
-				code: 'AY-01489',
-				submitted: 'Nov 15, 10:12 AM',
-				matchScore: '0.86',
-				mergedBy: 'Engr. [NAME]',
-				canUnmerge: true
-			}
-		]
-	},
-	{
-		id: 3,
-		groupCode: 'G-0281',
-		title: 'Row of streetlights out',
-		category: 'Streetlight',
-		street: 'Escario St',
-		barangay: 'Camputhaw',
-		firstReportedLabel: 'first reported Nov 10 (5 days ago)',
-		reports: 3,
-		ageDays: 5,
-		score: 71,
-		status: 'Verified',
-		photoCount: 3,
-		severityScore: 3,
-		severitySelect: '3 · Moderate: night visibility',
-		safetyImpact: 'Medium',
-		residentUpdate: 'Electrical maintenance team assigned for evening inspection.',
-		reportItems: [
-			{
-				id: 'r31',
-				code: 'AY-01410',
-				submitted: 'Nov 10, 7:45 PM',
-				matchScore: 'First report',
-				mergedBy: '—',
-				canUnmerge: false
-			},
-			{
-				id: 'r32',
-				code: 'AY-01418',
-				submitted: 'Nov 11, 8:10 PM',
-				matchScore: '0.81',
-				mergedBy: 'Staff [NAME]',
-				canUnmerge: true
-			},
-			{
-				id: 'r33',
-				code: 'AY-01440',
-				submitted: 'Nov 12, 7:05 PM',
-				matchScore: '0.78',
-				mergedBy: 'Staff [NAME]',
-				canUnmerge: true
-			}
-		]
-	},
-	{
-		id: 4,
-		groupCode: 'G-0255',
-		title: 'Flooding at canal inlet',
-		category: 'Drainage',
-		street: 'Salinas Dr',
-		barangay: 'Lahug',
-		firstReportedLabel: 'first reported Nov 3 (12 days ago)',
-		reports: 3,
-		ageDays: 12,
-		score: 67,
-		status: 'In progress',
-		photoCount: 3,
-		severityScore: 3,
-		severitySelect: '3 · Moderate: standing water',
-		safetyImpact: 'High',
-		residentUpdate: 'Debris clearing scheduled along canal inlet.',
-		reportItems: [
-			{
-				id: 'r41',
-				code: 'AY-01370',
-				submitted: 'Nov 3, 2:10 PM',
-				matchScore: 'First report',
-				mergedBy: '—',
-				canUnmerge: false
-			},
-			{
-				id: 'r42',
-				code: 'AY-01385',
-				submitted: 'Nov 5, 4:25 PM',
-				matchScore: '0.83',
-				mergedBy: 'Engr. [NAME]',
-				canUnmerge: true
-			},
-			{
-				id: 'r43',
-				code: 'AY-01412',
-				submitted: 'Nov 7, 11:00 AM',
-				matchScore: '0.77',
-				mergedBy: 'Staff [NAME]',
-				canUnmerge: true
-			}
-		]
-	},
-	{
-		id: 5,
-		groupCode: 'G-0302',
-		title: 'Collapsed sidewalk edge',
-		category: 'Sidewalk',
-		street: 'Juan Luna Ave',
-		barangay: 'Mabolo',
-		firstReportedLabel: 'first reported Nov 12 (3 days ago)',
-		reports: 2,
-		ageDays: 3,
-		score: 52,
-		status: 'Received',
-		photoCount: 2,
-		severityScore: 2,
-		severitySelect: '2 · Minor: pedestrian detour',
-		safetyImpact: 'Medium',
-		residentUpdate: 'Logged for site assessment by district engineering.',
-		reportItems: [
-			{
-				id: 'r51',
-				code: 'AY-01444',
-				submitted: 'Nov 12, 9:30 AM',
-				matchScore: 'First report',
-				mergedBy: '—',
-				canUnmerge: false
-			},
-			{
-				id: 'r52',
-				code: 'AY-01468',
-				submitted: 'Nov 14, 3:40 PM',
-				matchScore: '0.80',
-				mergedBy: 'Staff [NAME]',
-				canUnmerge: true
-			}
-		]
-	},
-	{
-		id: 6,
-		groupCode: 'G-0299',
-		title: 'Cracked asphalt patch',
-		category: 'Road damage',
-		street: 'Banilad Rd',
-		barangay: 'Banilad',
-		firstReportedLabel: 'first reported Nov 9 (6 days ago)',
-		reports: 1,
-		ageDays: 6,
-		score: 41,
-		status: 'Received',
-		photoCount: 2,
-		severityScore: 2,
-		severitySelect: '2 · Minor: surface wear',
-		safetyImpact: 'Low',
-		residentUpdate: 'Queued for routine pavement patching review.',
-		reportItems: [
-			{
-				id: 'r61',
-				code: 'AY-01425',
-				submitted: 'Nov 9, 10:15 AM',
-				matchScore: 'First report',
-				mergedBy: '—',
-				canUnmerge: false
-			}
-		]
-	},
-	{
-		id: 7,
-		groupCode: 'G-0311',
-		title: 'Flickering streetlight',
-		category: 'Streetlight',
-		street: 'V. Rama Ave',
-		barangay: 'Guadalupe',
-		firstReportedLabel: 'first reported Nov 13 (2 days ago)',
-		reports: 1,
-		ageDays: 2,
-		score: 28,
-		status: 'Received',
-		photoCount: 1,
-		severityScore: 1,
-		severitySelect: '1 · Low: intermittent',
-		safetyImpact: 'Low',
-		residentUpdate: 'Queued for bulb/starter check.',
-		reportItems: [
-			{
-				id: 'r71',
-				code: 'AY-01455',
-				submitted: 'Nov 13, 7:55 PM',
-				matchScore: 'First report',
-				mergedBy: '—',
-				canUnmerge: false
-			}
-		]
-	}
-];
+	};
+}
+
+function errorText(error: unknown) {
+	return error instanceof Error ? error.message : String(error);
+}
 
 class QueueState {
-	items = $state<IssueGroup[]>(INITIAL_ISSUES);
 	selectedCategory = $state<string>('ALL');
 	selectedBarangay = $state<string>('ALL');
-	selectedIssueId = $state<number | null>(null);
+	selectedIssueId = $state<string | null>(null);
 	feedback = $state<string | null>(null);
+	/** Unsent "Update to residents" text, by group id. */
+	drafts = $state<Record<string, string>>({});
+
+	/** Every issue group: reports that aren't merged into another one. */
+	items = $derived.by(() => {
+		const now = Date.now();
+		return reports.docs.filter((d) => !d.mergedInto).map((d) => buildGroup(d, this.drafts, now));
+	});
 
 	categories = $derived(Array.from(new Set(this.items.map((i) => i.category))).sort());
 	barangays = $derived(Array.from(new Set(this.items.map((i) => i.barangay))).sort());
 
+	/** Open groups (not resolved) matching the filters, highest score first. */
 	filteredItems = $derived(
 		this.items
 			.filter((item) => {
+				const open = item.status !== 'Resolved';
 				const matchCat = this.selectedCategory === 'ALL' || item.category === this.selectedCategory;
 				const matchBrgy =
 					this.selectedBarangay === 'ALL' || item.barangay === this.selectedBarangay;
-				return matchCat && matchBrgy;
+				return open && matchCat && matchBrgy;
 			})
 			.sort((a, b) => b.score - a.score)
 	);
@@ -361,7 +182,22 @@ class QueueState {
 
 	criticalCount = $derived(this.filteredItems.filter((i) => i.score >= 80).length);
 
-	openIssue(id: number) {
+	/** Reports behind the listed groups. */
+	reportTotal = $derived(this.filteredItems.reduce((sum, i) => sum + i.reports, 0));
+
+	/** Median hours from submission to verification over the last 30 days, or null. */
+	medianVerifyHours = $derived.by(() => {
+		const since = Date.now() - 30 * DAY_MS;
+		const hours = reports.docs
+			.filter((d) => d.verifiedAtTs && d.verifiedAtTs.getTime() >= since)
+			.map((d) => (d.verifiedAtTs!.getTime() - d.createdAt.getTime()) / 3_600_000)
+			.sort((a, b) => a - b);
+		if (hours.length === 0) return null;
+		const mid = Math.floor(hours.length / 2);
+		return hours.length % 2 ? hours[mid] : (hours[mid - 1] + hours[mid]) / 2;
+	});
+
+	openIssue(id: string) {
 		this.feedback = null;
 		this.selectedIssueId = id;
 	}
@@ -371,18 +207,110 @@ class QueueState {
 		this.selectedIssueId = null;
 	}
 
-	unmergeReport(issueId: number, reportCode: string) {
-		const issue = this.items.find((i) => i.id === issueId);
-		if (!issue) return;
-		issue.reportItems = issue.reportItems.filter((r) => r.code !== reportCode);
-		issue.reports = Math.max(1, issue.reportItems.length);
-		this.feedback = `Unmerged ${reportCode} from ${issue.groupCode}.`;
+	/** The lead report and every report merged into it. */
+	#members(issueId: string) {
+		const lead = reports.byId(issueId);
+		return lead ? [lead, ...reports.childrenOf(issueId)] : [];
 	}
 
-	sendUpdate(issueId: number) {
+	/** Sets the status on the group and every merged report, so each resident sees it. */
+	async setStatus(issueId: string, label: IssueStatus) {
+		const status = statusCodes[label];
+		const now = new Date();
+		const batch = writeBatch(db);
+		for (const member of this.#members(issueId)) {
+			const patch: Record<string, unknown> = { status };
+			if (status !== 'received' && !member.verifiedAt) {
+				patch.verifiedAt = formatDayTime(now);
+				patch.verifiedAtTs = now;
+			}
+			if (status === 'resolved') {
+				patch.resolvedOn = formatDay(now);
+				// The mobile app asks the reporter "LGU marked this fixed. Is it?"
+				patch.awaitingConfirmation = true;
+			} else {
+				patch.resolvedOn = deleteField();
+				patch.awaitingConfirmation = deleteField();
+			}
+			batch.update(reportRef(member.id), patch);
+		}
+		try {
+			await batch.commit();
+			this.feedback = `Status set to ${label} on ${issueId}.`;
+		} catch (error) {
+			this.feedback = `Couldn't update the status: ${errorText(error)}`;
+		}
+	}
+
+	async setSeverity(issueId: string, option: string) {
+		const severity = Number.parseInt(option, 10);
+		if (!Number.isInteger(severity)) return;
+		try {
+			await updateDoc(reportRef(issueId), { severity });
+		} catch (error) {
+			this.feedback = `Couldn't save the severity: ${errorText(error)}`;
+		}
+	}
+
+	setDraft(issueId: string, text: string) {
+		this.drafts[issueId] = text;
+	}
+
+	/** Splits a merged report back out into its own group. */
+	async unmergeReport(issueId: string, reportCode: string) {
+		const child = reports.byId(reportCode);
+		if (!child) return;
+		const batch = writeBatch(db);
+		batch.update(reportRef(reportCode), {
+			mergedInto: deleteField(),
+			mergeScore: deleteField(),
+			mergedBy: deleteField(),
+			mergedAt: deleteField(),
+			// Don't suggest the same match again in duplicate review.
+			notDuplicateOf: arrayUnion(issueId)
+		});
+		batch.update(reportRef(issueId), { reportCount: increment(-child.reportCount) });
+		// Undoing a merge means the match was wrong; record that for the evaluation.
+		batch.set(
+			suggestionRef(reportCode, issueId),
+			{
+				reportId: reportCode,
+				candidateGroupId: issueId,
+				decision: 'rejected',
+				unmerged: true,
+				reviewedBy: staff.user?.uid ?? '',
+				reviewedAt: serverTimestamp()
+			},
+			{ merge: true }
+		);
+		try {
+			await batch.commit();
+			this.feedback = `Unmerged ${reportCode} from ${issueId}.`;
+		} catch (error) {
+			this.feedback = `Couldn't unmerge ${reportCode}: ${errorText(error)}`;
+		}
+	}
+
+	/** Posts the update as the status note on every report in the group. */
+	async sendUpdate(issueId: string) {
 		const issue = this.items.find((i) => i.id === issueId);
 		if (!issue) return;
-		this.feedback = `Update sent to all ${issue.reports} reporters on ${issue.groupCode}.`;
+		const note = issue.residentUpdate.trim();
+		if (!note) {
+			this.feedback = 'Write an update before sending it.';
+			return;
+		}
+		const batch = writeBatch(db);
+		for (const member of this.#members(issueId)) {
+			batch.update(reportRef(member.id), { statusNote: note });
+		}
+		try {
+			await batch.commit();
+			delete this.drafts[issueId];
+			this.feedback = `Update sent to all ${issue.reports} reporters on ${issue.groupCode}.`;
+		} catch (error) {
+			this.feedback = `Couldn't send the update: ${errorText(error)}`;
+		}
 	}
 
 	exportCsv() {
@@ -403,8 +331,8 @@ class QueueState {
 			`"${item.groupCode}"`,
 			`"${item.title.replaceAll('"', '""')}"`,
 			`"${item.category}"`,
-			`"${item.street}"`,
-			`"${item.barangay}"`,
+			`"${item.street.replaceAll('"', '""')}"`,
+			`"${item.barangay.replaceAll('"', '""')}"`,
 			item.reports,
 			item.ageDays,
 			item.score,
