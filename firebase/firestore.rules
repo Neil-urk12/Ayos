@@ -10,9 +10,21 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
-    // LGU staff get a custom claim set from the Admin SDK: setCustomUserClaims(uid, { staff: true }).
+    function userRole() {
+      let path = /databases/$(database)/documents/users/$(request.auth.uid);
+      return exists(path) ? get(path).data.get('role', '') : '';
+    }
+
+    // LGU admins: role 'admin' on users/{uid}, set by hand in the Firebase console.
+    function isAdmin() {
+      return signedIn() && userRole() == 'admin';
+    }
+
+    // LGU staff: role 'staff' or 'admin' on users/{uid}, set by hand in the Firebase console,
+    // or the `staff` custom claim set by apps/web/scripts/set-staff.mjs.
     function isStaff() {
-      return signedIn() && request.auth.token.staff == true;
+      return signedIn()
+        && (request.auth.token.get('staff', false) == true || userRole() in ['staff', 'admin']);
     }
 
     function changedOnly(fields) {
@@ -43,7 +55,8 @@ service cloud.firestore {
     // Field set and types for a new report, matching submitNew in reports-store.tsx.
     function validNewReport(data) {
       let fields = ['reporterId', 'title', 'category', 'street', 'area', 'reportCount', 'status',
-        'reportedOn', 'receivedAt', 'danger', 'description', 'photoTone', 'map'];
+        'reportedOn', 'receivedAt', 'danger', 'description', 'photoTone', 'map', 'accuracy',
+        'createdAt'];
       return data.keys().hasAll(fields) && data.keys().hasOnly(fields)
         && validText(data.title, 200) && data.title.size() > 0
         && data.category in ['road', 'drainage', 'streetlight', 'sidewalk']
@@ -54,7 +67,9 @@ service cloud.firestore {
         && data.danger is bool
         && validText(data.description, 2000)
         && validText(data.photoTone, 50)
-        && data.map is map && data.map.x is number && data.map.y is number;
+        && data.map is map && data.map.x is number && data.map.y is number
+        && data.accuracy is number
+        && data.createdAt == request.time;
     }
 
     // A user's own profile, written at sign-up by src/lib/firebase/users.ts.
@@ -137,12 +152,45 @@ service cloud.firestore {
         // joining (reportCount + 1 in the same batch). A bare supporter doc would grant
         // confirm-fix rights without joining.
         allow create: if isOwner(uid) && isResident()
+          && request.resource.data.keys().hasOnly(['uid', 'joinedAt'])
+          && request.resource.data.uid == uid
+          && request.resource.data.joinedAt == request.time
           && ((!exists(reportPath(reportId)) && getAfter(reportPath(reportId)).data.reporterId == uid)
             || getAfter(reportPath(reportId)).data.reportCount
               == get(reportPath(reportId)).data.reportCount + 1);
         // Staff only: a self-delete would let the same person join (and count) again.
         allow delete: if isStaff();
       }
+    }
+
+    // Road safety tips, shown to everyone in the app (guests included). Edited by admins in
+    // the Firebase console until FR-21 has a screen; seeded by apps/web/scripts/seed.mjs.
+    match /tips/{tipId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    // settings/priority: priority weights and duplicate thresholds used by the dashboard.
+    match /settings/{settingId} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+
+    // One doc per reviewed duplicate suggestion ({reportId}_{groupId}), written by the
+    // dashboard when staff decide, so decisions are kept for the duplicate evaluation.
+    match /duplicateSuggestions/{suggestionId} {
+      allow read: if isStaff();
+      allow create, update: if isStaff()
+        && request.resource.data.decision in ['confirmed', 'rejected', 'recurrence']
+        && request.resource.data.reviewedBy == request.auth.uid
+        && request.resource.data.reviewedAt == request.time;
+      allow delete: if false;
+    }
+
+    // Collection-group reads of supporters, so the app can list the reports a resident
+    // joined (reports-store.tsx queries supporters where uid == me). Same access as above.
+    match /{path=**}/supporters/{uid} {
+      allow read: if signedIn();
     }
 
     // Everything else is denied by default.
