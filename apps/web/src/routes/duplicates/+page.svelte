@@ -4,10 +4,17 @@
 
 	const item = $derived(duplicates.current);
 	const distancePct = $derived(
-		Math.min(100, Math.round((item.metrics.distanceMeters / item.metrics.maxRadiusMeters) * 100))
+		item
+			? Math.min(100, Math.round((item.metrics.distanceMeters / item.metrics.maxRadiusMeters) * 100))
+			: 0
 	);
 	const timeGapPct = $derived(
-		Math.min(100, Math.max(12, Math.round((item.metrics.timeGapDays / item.metrics.maxWindowDays) * 100)))
+		item
+			? Math.min(
+					100,
+					Math.max(12, Math.round((item.metrics.timeGapDays / item.metrics.maxWindowDays) * 100))
+				)
+			: 0
 	);
 </script>
 
@@ -30,6 +37,9 @@
 	</div>
 {/if}
 
+{#if !item}
+	<p class="empty">No duplicate suggestions right now.</p>
+{:else}
 <div class="review-grid">
 	<!-- Left column: Side-by-side report comparison + action bar -->
 	<div class="left-stack">
@@ -107,12 +117,18 @@
 			<div class="metric-block">
 				<div class="metric-row">
 					<span class="metric-label">Image similarity</span>
-					<span class="metric-val">{item.metrics.imageSimilarity.toFixed(2)}</span>
+					<span class="metric-val">
+						{item.metrics.imageSimilarity === null ? '—' : item.metrics.imageSimilarity.toFixed(2)}
+					</span>
 				</div>
 				<div class="track">
-					<div class="fill" style="width: {item.metrics.imageSimilarity * 100}%;"></div>
+					<div class="fill" style="width: {(item.metrics.imageSimilarity ?? 0) * 100}%;"></div>
 				</div>
-				<p class="metric-hint">Photo embeddings compared by cosine similarity</p>
+				<p class="metric-hint">
+					{item.metrics.imageSimilarity === null
+						? 'Not compared yet: report photos aren’t uploaded'
+						: 'Photo embeddings compared by cosine similarity'}
+				</p>
 			</div>
 
 			<div class="metric-block">
@@ -158,8 +174,16 @@
 		/>
 	</aside>
 </div>
+{/if}
 
 <style>
+	.empty {
+		padding: 40px 0;
+		text-align: center;
+		font-size: 0.9rem;
+		color: #64748b;
+	}
+
 	.page-head {
 		display: flex;
 		align-items: flex-start;
