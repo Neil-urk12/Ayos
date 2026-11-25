@@ -1,0 +1,83 @@
+[
+  {
+    "id": "m-1",
+    "audience": "motorists",
+    "order": 1,
+    "icon": "alert",
+    "category": "Road damage",
+    "title": "Slow down near wet or shaded potholes",
+    "body": "Standing water and tree shadows can hide deep road craters. Reduce speed to protect your tires, suspension, and nearby pedestrians from splashes."
+  },
+  {
+    "id": "m-2",
+    "audience": "motorists",
+    "order": 2,
+    "icon": "droplet",
+    "category": "Drainage",
+    "title": "Never drive through flooded drainage inlets",
+    "body": "Moving floodwater over clogged drains can conceal open manholes or washed-out pavement. Reroute when water depth reaches curb height."
+  },
+  {
+    "id": "m-3",
+    "audience": "motorists",
+    "order": 3,
+    "icon": "bulb",
+    "category": "Streetlight",
+    "title": "Stay alert on unlit barangay streets",
+    "body": "Use low beams when approaching oncoming traffic and watch closely for pedestrians and cyclists along stretches with busted streetlights."
+  },
+  {
+    "id": "c-1",
+    "audience": "cyclists",
+    "order": 1,
+    "icon": "bulb",
+    "category": "Visibility",
+    "title": "Run front and rear lights after dusk",
+    "body": "Equip your bike with a steady white front light and a blinking red taillight so motorists can spot you early in poorly lit areas."
+  },
+  {
+    "id": "c-2",
+    "audience": "cyclists",
+    "order": 2,
+    "icon": "pin",
+    "category": "Navigation",
+    "title": "Check blind spots before swerving around hazards",
+    "body": "Signal early and shoulder-check before steering wide around potholes, uneven concrete slabs, or clogged roadside grates."
+  },
+  {
+    "id": "c-3",
+    "audience": "cyclists",
+    "order": 3,
+    "icon": "droplet",
+    "category": "Drainage",
+    "title": "Cross metal drain grates straight on",
+    "body": "Wet steel grates become slick and narrow slots can catch thin tires. Approach squarely at a controlled speed."
+  },
+  {
+    "id": "p-1",
+    "audience": "pedestrians",
+    "order": 1,
+    "icon": "shield",
+    "category": "Walkways",
+    "title": "Walk facing oncoming traffic on obstructed roads",
+    "body": "When broken sidewalks or ongoing LGU repairs force you onto the road shoulder, walk facing traffic so you can see approaching vehicles."
+  },
+  {
+    "id": "p-2",
+    "audience": "pedestrians",
+    "order": 2,
+    "icon": "bulb",
+    "category": "Visibility",
+    "title": "Wear bright or reflective gear at night",
+    "body": "Light-colored clothing or reflective strips make you visible from a safe braking distance along streets with dead streetlights."
+  },
+  {
+    "id": "p-3",
+    "audience": "pedestrians",
+    "order": 3,
+    "icon": "camera",
+    "category": "Reporting",
+    "title": "Snap hazard photos from a safe distance",
+    "body": "Step onto a safe sidewalk or curb before taking photos for AYOS—never stand in active traffic lanes to document road damage."
+  }
+]

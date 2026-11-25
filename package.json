@@ -4,6 +4,8 @@
   "scripts": {
     "mobile": "pnpm --filter mobile start",
     "web": "pnpm --filter web dev",
+    "set-staff": "pnpm --filter web set-staff",
+    "seed": "pnpm --filter web seed",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
     "lint": "pnpm -r lint"

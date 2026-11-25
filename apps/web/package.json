@@ -14,17 +14,23 @@
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-		"lint": "eslint ."
+		"lint": "eslint .",
+		"set-staff": "node scripts/set-staff.mjs",
+		"seed": "node scripts/seed.mjs"
+	},
+	"dependencies": {
+		"firebase": "^13.4.0"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
-		"@sveltejs/adapter-auto": "^8.0.0",
+		"@sveltejs/adapter-static": "^4.0.1",
 		"@sveltejs/kit": "^3.0.0",
 		"@sveltejs/vite-plugin-svelte": "^7.2.0",
 		"@types/node": "^24",
 		"eslint": "^10.4.1",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.19.0",
+		"firebase-admin": "^14.5.1",
 		"globals": "^17.6.0",
 		"svelte": "^5.57.2",
 		"svelte-check": "^4.6.0",
