@@ -10,4 +10,6 @@ export const collections = {
   reports: 'reports',
   /** Subcollection under reports/{id}: one doc per resident who joined the report. */
   supporters: 'supporters',
+  /** Road safety tips shown on the Safety tips tab. */
+  tips: 'tips',
 } as const;
