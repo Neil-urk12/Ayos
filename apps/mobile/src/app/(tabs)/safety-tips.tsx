@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Icon, type IconName } from '../../components/ayos/icon';
+import { Icon, isIconName, type IconName } from '../../components/ayos/icon';
 import { colors, fonts, radius, type } from '../../constants/design';
+import defaultTipsJson from '../../data/default-tips.json';
+import { watchTips, type TipDoc } from '../../lib/firebase/tips';
 
 type UserType = 'motorists' | 'cyclists' | 'pedestrians';
 
@@ -15,86 +17,43 @@ type SafetyTip = {
   description: string;
 };
 
-const tipsByGroup: Record<UserType, SafetyTip[]> = {
-  motorists: [
-    {
-      id: 'm-1',
-      icon: 'alert',
-      category: 'Road damage',
-      title: 'Slow down near wet or shaded potholes',
-      description:
-        'Standing water and tree shadows can hide deep road craters. Reduce speed to protect your tires, suspension, and nearby pedestrians from splashes.',
-    },
-    {
-      id: 'm-2',
-      icon: 'droplet',
-      category: 'Drainage',
-      title: 'Never drive through flooded drainage inlets',
-      description:
-        'Moving floodwater over clogged drains can conceal open manholes or washed-out pavement. Reroute when water depth reaches curb height.',
-    },
-    {
-      id: 'm-3',
-      icon: 'bulb',
-      category: 'Streetlight',
-      title: 'Stay alert on unlit barangay streets',
-      description:
-        'Use low beams when approaching oncoming traffic and watch closely for pedestrians and cyclists along stretches with busted streetlights.',
-    },
-  ],
-  cyclists: [
-    {
-      id: 'c-1',
-      icon: 'bulb',
-      category: 'Visibility',
-      title: 'Run front and rear lights after dusk',
-      description:
-        'Equip your bike with a steady white front light and a blinking red taillight so motorists can spot you early in poorly lit areas.',
-    },
-    {
-      id: 'c-2',
-      icon: 'pin',
-      category: 'Navigation',
-      title: 'Check blind spots before swerving around hazards',
-      description:
-        'Signal early and shoulder-check before steering wide around potholes, uneven concrete slabs, or clogged roadside grates.',
-    },
-    {
-      id: 'c-3',
-      icon: 'droplet',
-      category: 'Drainage',
-      title: 'Cross metal drain grates straight on',
-      description:
-        'Wet steel grates become slick and narrow slots can catch thin tires. Approach squarely at a controlled speed.',
-    },
-  ],
-  pedestrians: [
-    {
-      id: 'p-1',
-      icon: 'shield',
-      category: 'Walkways',
-      title: 'Walk facing oncoming traffic on obstructed roads',
-      description:
-        'When broken sidewalks or ongoing LGU repairs force you onto the road shoulder, walk facing traffic so you can see approaching vehicles.',
-    },
-    {
-      id: 'p-2',
-      icon: 'bulb',
-      category: 'Visibility',
-      title: 'Wear bright or reflective gear at night',
-      description:
-        'Light-colored clothing or reflective strips make you visible from a safe braking distance along streets with dead streetlights.',
-    },
-    {
-      id: 'p-3',
-      icon: 'camera',
-      category: 'Reporting',
-      title: 'Snap hazard photos from a safe distance',
-      description:
-        'Step onto a safe sidewalk or curb before taking photos for AYOS—never stand in active traffic lanes to document road damage.',
-    },
-  ],
-};
+/** Bundled copy of the tips; shown until Firestore answers, or if tips/ is empty or unreachable. */
+const defaultTips = defaultTipsJson as TipDoc[];
+
+function toTip(doc: TipDoc): SafetyTip {
+  return {
+    id: doc.id,
+    icon: isIconName(doc.icon) ? doc.icon : 'shield',
+    category: doc.category,
+    title: doc.title,
+    description: doc.body,
+  };
+}
+
+function groupTips(docs: TipDoc[]): Record<UserType, SafetyTip[]> {
+  const sorted = [...docs].sort((a, b) => a.order - b.order);
+  const forTab = (tab: UserType) =>
+    sorted.filter((t) => t.audience === tab || t.audience === 'all').map(toTip);
+  return {
+    motorists: forTab('motorists'),
+    cyclists: forTab('cyclists'),
+    pedestrians: forTab('pedestrians'),
+  };
+}
+
+/** Tips from Firestore (tips/{tipId}), falling back to the bundled copy. */
+function useTipsByGroup() {
+  const [docs, setDocs] = useState<TipDoc[] | null>(null);
+  useEffect(
+    () =>
+      watchTips(setDocs, (error) => {
+        console.warn('[tips] Could not load tips:', error.message);
+        setDocs(null);
+      }),
+    [],
+  );
+  return groupTips(docs && docs.length > 0 ? docs : defaultTips);
+}
 
 const groups = [
   ['motorists', 'Motorists'],
@@ -104,6 +63,7 @@ const groups = [
 
 export default function SafetyTipsScreen() {
   const [tab, setTab] = useState<UserType>('motorists');
+  const tipsByGroup = useTipsByGroup();
   const listed = tipsByGroup[tab];
 
   return (

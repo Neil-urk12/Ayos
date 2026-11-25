@@ -40,6 +40,8 @@ export default function MapScreen() {
   const visible = reports.filter(
     (r) =>
       r.status !== 'resolved' &&
+      // Merged reports are shown through the report they were merged into.
+      !r.mergedInto &&
       (filter === 'all' || r.category === filter) &&
       (!needle || `${r.title} ${r.street} ${r.area}`.toLowerCase().includes(needle)),
   );

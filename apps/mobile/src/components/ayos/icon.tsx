@@ -31,6 +31,11 @@ const ionIcons = {
 
 export type IconName = keyof typeof featherIcons | keyof typeof ionIcons;
 
+/** For names that come from data (e.g. tips in Firestore) rather than code. */
+export function isIconName(name: string): name is IconName {
+  return name in featherIcons || name in ionIcons;
+}
+
 type IconProps = {
   name: IconName;
   size?: number;
