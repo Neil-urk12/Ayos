@@ -1,5 +1,6 @@
 <script lang="ts">
 	import IssueDetailView from '#lib/components/IssueDetailView.svelte';
+	import { duplicates } from '#lib/state/duplicates.svelte.ts';
 	import { queue } from '#lib/state/queue.svelte.ts';
 
 	function scoreColor(score: number): string {
@@ -51,13 +52,13 @@
 	<div class="kpi-card">
 		<div class="kpi-label">Open issue groups</div>
 		<div class="kpi-value">{queue.filteredItems.length}</div>
-		<div class="kpi-note">From 213 reports (sample)</div>
+		<div class="kpi-note">From {queue.reportTotal} {queue.reportTotal === 1 ? 'report' : 'reports'}</div>
 	</div>
 
 	<div class="kpi-card">
 		<div class="kpi-label">Awaiting duplicate check</div>
-		<div class="kpi-value">12</div>
-		<div class="kpi-note">Oldest waiting 6 h</div>
+		<div class="kpi-value">{duplicates.totalCount}</div>
+		<div class="kpi-note">{duplicates.oldestWaitingLabel ?? 'Nothing waiting'}</div>
 	</div>
 
 	<div class="kpi-card">
@@ -68,7 +69,9 @@
 
 	<div class="kpi-card">
 		<div class="kpi-label">Median time to verify</div>
-		<div class="kpi-value">3.2 h</div>
+		<div class="kpi-value">
+			{queue.medianVerifyHours === null ? '—' : `${queue.medianVerifyHours.toFixed(1)} h`}
+		</div>
 		<div class="kpi-note">Last 30 days</div>
 	</div>
 </section>

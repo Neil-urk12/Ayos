@@ -1,8 +1,11 @@
 <script lang="ts">
-	import type { IssueGroup } from '#lib/state/queue.svelte.ts';
+	import type { IssueGroup, IssueStatus } from '#lib/state/queue.svelte.ts';
 	import { queue } from '#lib/state/queue.svelte.ts';
+	import { settings } from '#lib/state/settings.svelte.ts';
 
 	let { issue }: { issue: IssueGroup } = $props();
+
+	const weights = $derived(settings.current.weights);
 </script>
 
 <div class="detail-topbar">
@@ -11,10 +14,16 @@
 	</button>
 
 	<div class="top-actions">
-		<select bind:value={issue.status} aria-label="Issue status" class="status-select">
+		<select
+			value={issue.status}
+			onchange={(e) => queue.setStatus(issue.id, e.currentTarget.value as IssueStatus)}
+			aria-label="Issue status"
+			class="status-select"
+		>
 			<option value="In progress">In progress</option>
 			<option value="Verified">Verified</option>
 			<option value="Received">Received</option>
+			<option value="Resolved">Resolved</option>
 		</select>
 		<button
 			type="button"
@@ -103,7 +112,7 @@
 
 			<div class="weight-item">
 				<div class="weight-row">
-					<span class="weight-label">Severity <small>· weight 0.35</small></span>
+					<span class="weight-label">Severity <small>· weight {weights.severity.toFixed(2)}</small></span>
 					<span class="weight-val">{issue.severityScore} / 5</span>
 				</div>
 				<div class="bar-bg">
@@ -113,7 +122,7 @@
 
 			<div class="weight-item">
 				<div class="weight-row">
-					<span class="weight-label">Public safety impact <small>· weight 0.30</small></span>
+					<span class="weight-label">Public safety impact <small>· weight {weights.safety.toFixed(2)}</small></span>
 					<span class="weight-val">{issue.safetyImpact}</span>
 				</div>
 				<div class="bar-bg">
@@ -126,7 +135,7 @@
 
 			<div class="weight-item">
 				<div class="weight-row">
-					<span class="weight-label">Issue age <small>· weight 0.15</small></span>
+					<span class="weight-label">Issue age <small>· weight {weights.age.toFixed(2)}</small></span>
 					<span class="weight-val">{issue.ageDays} days</span>
 				</div>
 				<div class="bar-bg">
@@ -136,7 +145,7 @@
 
 			<div class="weight-item">
 				<div class="weight-row">
-					<span class="weight-label">Corroborating reports <small>· weight 0.20</small></span>
+					<span class="weight-label">Corroborating reports <small>· weight {weights.reports.toFixed(2)}</small></span>
 					<span class="weight-val">{issue.reports}</span>
 				</div>
 				<div class="bar-bg">
@@ -146,7 +155,12 @@
 
 			<div class="severity-box">
 				<label for="staff-severity" class="field-label">Severity (set by staff)</label>
-				<select id="staff-severity" bind:value={issue.severitySelect} class="full-select">
+				<select
+					id="staff-severity"
+					value={issue.severitySelect}
+					onchange={(e) => queue.setSeverity(issue.id, e.currentTarget.value)}
+					class="full-select"
+				>
 					<option value="4 · Major: affects traffic">4 · Major: affects traffic</option>
 					<option value="3 · Moderate: night visibility">3 · Moderate: night visibility</option>
 					<option value="2 · Minor: pedestrian detour">2 · Minor: pedestrian detour</option>
@@ -158,7 +172,12 @@
 
 		<section class="panel" aria-label="Update to residents">
 			<h2>Update to residents</h2>
-			<textarea bind:value={issue.residentUpdate} rows="3" class="update-textarea"></textarea>
+			<textarea
+				value={issue.residentUpdate}
+				oninput={(e) => queue.setDraft(issue.id, e.currentTarget.value)}
+				rows="3"
+				class="update-textarea"
+			></textarea>
 			<button type="button" class="btn-primary-full" onclick={() => queue.sendUpdate(issue.id)}>
 				Send to all {issue.reports} reporters
 			</button>

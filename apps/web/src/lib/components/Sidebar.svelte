@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { staff } from '#lib/state/auth.svelte.ts';
 	import { duplicates } from '#lib/state/duplicates.svelte.ts';
 
 	interface NavItem {
@@ -27,9 +27,8 @@
 		if (onLogout) {
 			onLogout();
 		} else {
-			// shortcut: /login doesn't exist yet and resolve() only accepts real routes; use resolve() once it does.
-			// eslint-disable-next-line svelte/no-navigation-without-resolve
-			goto('/login');
+			// The layout sends signed-out users to /login.
+			staff.signOut();
 		}
 	}
 </script>
@@ -73,7 +72,7 @@
 	</nav>
 
 	<div class="footer-card">
-		<div class="user-name">Engineer Uzia Lanz</div>
+		<div class="user-name">{staff.displayName}</div>
 		<div class="user-role">Reviewer · City Engineering</div>
 		<button type="button" class="logout-btn" onclick={handleLogout}>
 			<svg
