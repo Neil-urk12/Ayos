@@ -1,12 +1,26 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import type { DocumentData } from 'firebase/firestore';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { Alert } from 'react-native';
 
 import { colors } from '../constants/design';
 import {
+  answerFix,
+  createReport,
+  joinReport,
+  newReportId,
+  reportErrorMessage,
+  watchJoinedReportIds,
+  watchReports,
+  type ReportSnapshot,
+} from '../lib/firebase/reports';
+import { useAuth } from './auth-store';
+import {
   categoryLabels,
   draftLocation,
+  formatAgo,
   formatDay,
   formatTime,
-  seedReports,
+  mapDistance,
   type Report,
   type ReportDraft,
 } from './reports';
@@ -28,17 +42,85 @@ type ReportsContextValue = {
 
 const ReportsContext = createContext<ReportsContextValue | null>(null);
 
-let nextNumber = 1483;
+/** Reports this close to the draft pin, in the same category, count as "already reported?". */
+const SIMILAR_RADIUS_METRES = 50;
 
-/**
- * In-memory report store with mock data. Swap for the real API once the backend exists.
- */
+function toReport(id: string, data: DocumentData, mine: boolean): Report {
+  const createdAt: Date = data.createdAt?.toDate?.() ?? new Date();
+  const map = data.map ?? draftLocation.map;
+  return {
+    id,
+    title: data.title ?? '',
+    category: data.category,
+    street: data.street ?? '',
+    area: data.area ?? '',
+    distance: mapDistance(map, draftLocation.map),
+    reportCount: data.reportCount ?? 1,
+    status: data.status ?? 'received',
+    statusNote: data.statusNote,
+    mine,
+    reportedOn: data.reportedOn ?? formatDay(createdAt),
+    reportedAgo: formatAgo(createdAt),
+    receivedAt: data.receivedAt ?? '',
+    verifiedAt: data.verifiedAt,
+    assignedTo: data.assignedTo,
+    resolvedOn: data.resolvedOn,
+    awaitingConfirmation: data.awaitingConfirmation,
+    danger: data.danger,
+    description: data.description,
+    photoTone: data.photoTone ?? colors.photo,
+    map,
+    mergedInto: data.mergedInto,
+  };
+}
+
+function createdMs(data: DocumentData): number {
+  return data.createdAt?.toMillis?.() ?? Date.now();
+}
+
+function showWriteError(title: string) {
+  return (error: unknown) => {
+    console.warn(`[reports] ${title}:`, error);
+    Alert.alert(title, reportErrorMessage(error));
+  };
+}
+
+/** Reports from Firestore (reports/{id}), kept live with onSnapshot. */
 export function ReportsProvider({ children }: { children: ReactNode }) {
-  const [reports, setReports] = useState<Report[]>(seedReports);
+  const { user, signedIn, isGuest } = useAuth();
+  const uid = signedIn && user ? user.uid : null;
+
+  // Tagged with the uid they were loaded for, so another account's data is never shown.
+  const [loaded, setLoaded] = useState<{ uid: string; docs: ReportSnapshot[] } | null>(null);
+  const [joined, setJoined] = useState<{ uid: string; ids: Set<string> } | null>(null);
   const [draft, setDraft] = useState<ReportDraft | null>(null);
 
-  const update = (id: string, patch: (report: Report) => Partial<Report>) =>
-    setReports((current) => current.map((r) => (r.id === id ? { ...r, ...patch(r) } : r)));
+  useEffect(() => {
+    if (!uid) return;
+    return watchReports(
+      (docs) => setLoaded({ uid, docs }),
+      (error) => console.warn('[reports] Could not load reports:', error.message),
+    );
+  }, [uid]);
+
+  useEffect(() => {
+    // Guests can't file or join reports, so they have none of their own.
+    if (!uid || isGuest) return;
+    return watchJoinedReportIds(
+      uid,
+      (ids) => setJoined({ uid, ids }),
+      (error) => console.warn('[reports] Could not load your reports:', error.message),
+    );
+  }, [uid, isGuest]);
+
+  const docs = loaded && loaded.uid === uid ? loaded.docs : [];
+  const joinedIds = joined && joined.uid === uid ? joined.ids : new Set<string>();
+  // Newest first, like the old in-memory list.
+  const reports = [...docs]
+    .sort((a, b) => createdMs(b.data) - createdMs(a.data))
+    .map(({ id, data }) =>
+      toReport(id, data, joinedIds.has(id) || (uid !== null && data.reporterId === uid)),
+    );
 
   const value: ReportsContextValue = {
     reports,
@@ -47,54 +129,46 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
     saveDraft: setDraft,
     findSimilar: (d) =>
       reports
-        .filter((r) => r.category === d.category && draftLocation.nearby[r.id] !== undefined)
-        .map((report) => ({ report, distance: draftLocation.nearby[report.id] }))
+        // Merged reports are part of another report's group; match the group instead.
+        .filter((r) => r.category === d.category && !r.mergedInto)
+        .map((report) => ({ report, distance: mapDistance(report.map, draftLocation.map) }))
+        .filter(({ distance }) => distance <= SIMILAR_RADIUS_METRES)
         .sort((a, b) => {
           const aOpen = a.report.status !== 'resolved' ? 0 : 1;
           const bOpen = b.report.status !== 'resolved' ? 0 : 1;
           return aOpen - bOpen || a.distance - b.distance;
         }),
     submitNew: (draft) => {
+      const id = newReportId();
+      if (!uid) return id;
       const now = new Date();
-      const id = `AY-0${nextNumber++}`;
-      const report: Report = {
-        id,
+      // The write shows up in the reports snapshot straight away (pending), so the
+      // report screen can open on it before the server confirms.
+      createReport(id, uid, {
         title: `${categoryLabels[draft.category]} on ${draft.street}`,
         category: draft.category,
         street: draft.street,
         area: draft.area,
-        distance: 0,
-        reportCount: 1,
-        status: 'received',
-        mine: true,
         reportedOn: formatDay(now),
-        reportedAgo: 'just now',
         receivedAt: `${formatDay(now)}, ${formatTime(now)}`,
         danger: draft.danger,
         description: draft.description,
         photoTone: colors.photo,
-        map: { x: 0.44, y: 0.53 },
-      };
-      setReports((current) => [report, ...current]);
+        map: draftLocation.map,
+        accuracy: draft.accuracy,
+      }).catch(showWriteError('Couldn’t send your report'));
       return id;
     },
     joinExisting: (id) => {
-      update(id, (r) => (r.mine ? {} : { mine: true, reportCount: r.reportCount + 1 }));
+      const report = reports.find((r) => r.id === id);
+      if (uid && report && !report.mine) {
+        joinReport(id, uid).catch(showWriteError('Couldn’t add your report'));
+      }
       return id;
     },
-    confirmFix: (id, fixed) =>
-      update(id, () =>
-        fixed
-          ? { awaitingConfirmation: false }
-          : {
-              awaitingConfirmation: false,
-              status: 'in_progress',
-              // Must match firebase/firestore.rules (reopen branch) exactly, or the write is denied.
-              statusNote: 'Reopened after you said it is still broken',
-              // shortcut: in-memory only; the Firestore write must use deleteField(), the rules reject null/undefined.
-              resolvedOn: undefined,
-            },
-      ),
+    confirmFix: (id, fixed) => {
+      answerFix(id, fixed).catch(showWriteError('Couldn’t save your answer'));
+    },
   };
 
   return <ReportsContext.Provider value={value}>{children}</ReportsContext.Provider>;
