@@ -3,11 +3,11 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, type IconName } from '../../components/ayos/icon';
-import { MapBackdrop } from '../../components/ayos/map-backdrop';
+import { Icon } from '../../components/ayos/icon';
+import { ReportMap } from '../../components/ayos/report-map';
 import { ReportRow } from '../../components/ayos/report-row';
 import { StatusBadge } from '../../components/ayos/status-badge';
-import { categoryColors, colors, fonts, radius, shadow, type } from '../../constants/design';
+import { colors, fonts, radius, shadow, type } from '../../constants/design';
 import {
   categoryLabels,
   categoryOrder,
@@ -19,19 +19,14 @@ import { useReports } from '../../data/reports-store';
 
 type Filter = 'all' | Category;
 
-const categoryIcons: Record<Category, IconName> = {
-  road: 'alert',
-  drainage: 'droplet',
-  streetlight: 'bulb',
-  sidewalk: 'alert',
-};
-
 const NEAR_RADIUS = 1000;
 const WIDE_RADIUS = 3000;
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
-  const { reports } = useReports();
+  const { reports, userPosition } = useReports();
+  // Height of the "Near you" sheet, so the map keeps its controls and logo above it.
+  const [sheetHeight, setSheetHeight] = useState(0);
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState(false);
@@ -56,15 +51,12 @@ export default function MapScreen() {
 
   return (
     <View style={styles.screen}>
-      <MapBackdrop />
-
-      {visible.map((report) => (
-        <Marker key={report.id} report={report} onPress={() => openReport(report)} />
-      ))}
-
-      <View style={styles.userHalo} pointerEvents="none">
-        <View style={styles.userDot} />
-      </View>
+      <ReportMap
+        reports={visible}
+        userPosition={userPosition}
+        onOpen={openReport}
+        bottomInset={sheetHeight}
+      />
 
       <View style={[styles.top, { paddingTop: insets.top + 12 }]}>
         <View style={styles.searchRow}>
@@ -106,7 +98,10 @@ export default function MapScreen() {
         </ScrollView>
       </View>
 
-      <View style={[styles.sheet, expanded && styles.sheetExpanded]}>
+      <View
+        style={[styles.sheet, expanded && styles.sheetExpanded]}
+        onLayout={(event) => setSheetHeight(event.nativeEvent.layout.height)}
+      >
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={expanded ? 'Collapse list' : 'Expand list'}
@@ -152,32 +147,6 @@ export default function MapScreen() {
   );
 }
 
-function Marker({ report, onPress }: { report: Report; onPress: () => void }) {
-  const showCount = report.reportCount > 1;
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${report.title}, ${report.reportCount} reports`}
-      onPress={onPress}
-      style={[
-        styles.marker,
-        showCount ? styles.markerLarge : styles.markerSmall,
-        {
-          left: `${report.map.x * 100}%`,
-          top: `${report.map.y * 100}%`,
-          backgroundColor: categoryColors[report.category],
-        },
-      ]}
-    >
-      {showCount ? (
-        <Text style={styles.markerCount}>{report.reportCount}</Text>
-      ) : (
-        <Icon name={categoryIcons[report.category]} size={17} color={colors.onPrimary} />
-      )}
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.map },
   top: { position: 'absolute', top: 0, left: 0, right: 0, gap: 12 },
@@ -213,47 +182,6 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: colors.text, borderColor: colors.text },
   chipText: { fontFamily: fonts.medium, fontSize: 14.5, color: colors.text },
   chipTextActive: { color: colors.onPrimary, fontFamily: fonts.semibold },
-  marker: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: colors.surface,
-    ...shadow.raised,
-  },
-  markerLarge: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    transform: [{ translateX: -20 }, { translateY: -20 }],
-  },
-  markerSmall: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    transform: [{ translateX: -17 }, { translateY: -17 }],
-  },
-  markerCount: { fontFamily: fonts.bold, fontSize: 14, color: colors.onPrimary },
-  userHalo: {
-    position: 'absolute',
-    left: '42%',
-    top: '52.5%',
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(37, 99, 235, 0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transform: [{ translateX: -25 }, { translateY: -25 }],
-  },
-  userDot: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#2563EB',
-    borderWidth: 3,
-    borderColor: colors.surface,
-  },
   sheet: {
     position: 'absolute',
     left: 0,

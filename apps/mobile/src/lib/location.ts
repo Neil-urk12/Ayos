@@ -37,6 +37,24 @@ export function toMapPosition({ latitude, longitude }: LatLng) {
   return { x: clamp(0.5 + east / MAP_SPAN_METRES), y: clamp(0.5 - north / MAP_SPAN_METRES) };
 }
 
+/** The GPS position of a spot on the map drawing: the inverse of toMapPosition. */
+export function fromMapPosition({ x, y }: { x: number; y: number }): LatLng {
+  const metresPerDegreeLng =
+    METRES_PER_DEGREE_LAT * Math.cos((MAP_CENTER.latitude * Math.PI) / 180);
+  return {
+    latitude: MAP_CENTER.latitude + ((0.5 - y) * MAP_SPAN_METRES) / METRES_PER_DEGREE_LAT,
+    longitude: MAP_CENTER.longitude + ((x - 0.5) * MAP_SPAN_METRES) / metresPerDegreeLng,
+  };
+}
+
+/** Where to put a report on a real map: its GPS fix, or (older reports) its map-drawing spot. */
+export function reportCoordinate(report: {
+  location?: LatLng;
+  map: { x: number; y: number };
+}): LatLng {
+  return report.location ?? fromMapPosition(report.map);
+}
+
 /** Metres between two GPS positions. */
 export function metresBetween(a: LatLng, b: LatLng) {
   return distanceBetween([a.latitude, a.longitude], [b.latitude, b.longitude]) * 1000;

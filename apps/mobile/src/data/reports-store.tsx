@@ -35,6 +35,8 @@ export type SimilarReport = { report: Report; distance: number };
 
 type ReportsContextValue = {
   reports: Report[];
+  /** The user's GPS position (null without permission or a fix yet), for the map. */
+  userPosition: LatLng | null;
   draft: ReportDraft | null;
   getReport: (id: string) => Report | undefined;
   saveDraft: (draft: ReportDraft) => void;
@@ -170,6 +172,7 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
 
   const value: ReportsContextValue = {
     reports,
+    userPosition: here.position,
     draft,
     getReport: (id) => reports.find((r) => r.id === id),
     saveDraft: setDraft,

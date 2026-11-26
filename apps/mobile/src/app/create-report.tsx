@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '../components/ayos/button';
 import { Icon } from '../components/ayos/icon';
+import { PlacePreview } from '../components/ayos/place-preview';
 import { HeaderNote, ScreenHeader } from '../components/ayos/screen-header';
 import { colors, fonts, radius, type } from '../constants/design';
 import {
@@ -250,15 +251,9 @@ export default function CreateReportScreen() {
           <View style={styles.field}>
             <FieldLabel required>Location</FieldLabel>
             <View style={styles.locationCard}>
-              <View style={styles.miniMap} accessibilityLabel="Map preview of the pin">
-                <View style={styles.miniRoadAcross} />
-                <View style={styles.miniRoadDown} />
-                <View style={styles.pin}>
-                  <View style={styles.pinHead}>
-                    <View style={styles.pinDot} />
-                  </View>
-                </View>
-              </View>
+              <PlacePreview
+                coordinate={place ? { latitude: place.latitude, longitude: place.longitude } : null}
+              />
               <View style={styles.locationRow} accessibilityLiveRegion="polite">
                 {placeState.status === 'loading' ? (
                   <>
@@ -455,42 +450,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
     overflow: 'hidden',
-  },
-  miniMap: { height: 84, backgroundColor: colors.map, overflow: 'hidden' },
-  miniRoadAcross: {
-    position: 'absolute',
-    left: '-10%',
-    width: '120%',
-    top: 30,
-    height: 14,
-    backgroundColor: colors.mapRoad,
-    transform: [{ rotate: '1.5deg' }],
-  },
-  miniRoadDown: {
-    position: 'absolute',
-    top: -20,
-    height: 130,
-    left: '43%',
-    width: 14,
-    backgroundColor: colors.mapRoad,
-    transform: [{ rotate: '-8deg' }],
-  },
-  pin: { position: 'absolute', left: '45%', top: 16 },
-  pinHead: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderBottomRightRadius: 0,
-    backgroundColor: colors.danger,
-    alignItems: 'center',
-    justifyContent: 'center',
-    transform: [{ rotate: '45deg' }],
-  },
-  pinDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.surface,
   },
   locationRow: {
     flexDirection: 'row',
