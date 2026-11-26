@@ -1,0 +1,3 @@
+-r requirements.txt
+# Only for scripts/fetch_model.py, not deployed.
+onnx~=1.23

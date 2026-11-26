@@ -7,6 +7,7 @@
     "set-staff": "pnpm --filter web set-staff",
     "seed": "pnpm --filter web seed",
     "test:rules": "firebase emulators:exec --project demo-ayos --only firestore,storage \"pnpm --filter rules test\"",
+    "test:functions": "firebase emulators:exec --project demo-ayos --only functions,firestore \"functions\\venv\\Scripts\\python -I functions/tests/emulator_check.py\"",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
     "lint": "pnpm -r lint"
