@@ -121,8 +121,10 @@ service cloud.firestore {
           && validText(request.resource.data.description, 2000)
           && request.resource.data.danger is bool)
         // Joining: bump reportCount by exactly 1 in the same batch that creates your
-        // supporters/{uid} doc, so each person counts once.
+        // supporters/{uid} doc, so each person counts once. Not on a merged report: its
+        // group's reportCount wouldn't include the join.
         || (isResident()
+          && !('mergedInto' in resource.data)
           && changedOnly(['reportCount'])
           && request.resource.data.reportCount == resource.data.reportCount + 1
           && !exists(supporterPath(reportId))

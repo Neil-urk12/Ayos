@@ -4,6 +4,7 @@ import {
   collectionGroup,
   deleteField,
   doc,
+  getDocFromServer,
   increment,
   onSnapshot,
   query,
@@ -100,6 +101,12 @@ export function joinReport(id: string, uid: string) {
   batch.update(reportRef(id), { reportCount: increment(1) });
   batch.set(supporterRef(id, uid), { uid, joinedAt: serverTimestamp() });
   return batch.commit();
+}
+
+/** The report this one was merged into, if any, read from the server (not the local copy). */
+export async function mergedIntoOnServer(id: string): Promise<string | undefined> {
+  const snap = await getDocFromServer(reportRef(id));
+  return snap.data()?.mergedInto;
 }
 
 /** Answers "LGU marked this fixed. Is it?" for a resolved report. */

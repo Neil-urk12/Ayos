@@ -1,5 +1,5 @@
 import { SvelteSet } from 'svelte/reactivity';
-import { arrayUnion, increment, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { arrayUnion, increment, runTransaction, serverTimestamp } from 'firebase/firestore';
 
 import { db } from '#lib/firebase.ts';
 import { staff } from './auth.svelte.ts';
@@ -225,51 +225,83 @@ class DuplicateReviewState {
 			return;
 		}
 
-		const batch = writeBatch(db);
-		if (decision === 'merged') {
-			// The report follows the group's status from now on, so its reporter sees progress.
-			const patch: Record<string, unknown> = {
-				mergedInto: groupId,
-				mergeScore: target.metrics.combinedScore.toFixed(2),
-				mergedBy: staff.displayName,
-				mergedAt: serverTimestamp(),
-				status: group.status
-			};
-			if (group.statusNote) patch.statusNote = group.statusNote;
-			if (group.verifiedAt) patch.verifiedAt = group.verifiedAt;
-			if (group.assignedTo) patch.assignedTo = group.assignedTo;
-			// Anything already merged into the report moves with it. Take their counts back
-			// off the report so a later unmerge subtracts only the report's own count.
-			const children = reports.childrenOf(reportId);
-			if (children.length > 0) {
-				patch.reportCount = report.reportCount - children.reduce((n, c) => n + c.reportCount, 0);
-			}
-			batch.update(reportRef(reportId), patch);
-			for (const child of children) {
-				batch.update(reportRef(child.id), { mergedInto: groupId });
-			}
-			// reportCount on the group counts everyone in it; unmerge takes it back off.
-			batch.update(reportRef(groupId), { reportCount: increment(report.reportCount) });
-		} else if (decision === 'rejected') {
-			batch.update(reportRef(reportId), { notDuplicateOf: arrayUnion(groupId) });
-		} else {
-			batch.update(reportRef(reportId), { recurrenceOf: groupId });
+		if (decision === 'merged' && group.status === 'resolved') {
+			// Merging would mark the new report fixed, with no way for its reporter to dispute it.
+			this.lastActionMessage = `${groupId} is resolved. Use "Recurrence of a fixed issue" instead.`;
+			return;
 		}
-		// Keep the decision and the evidence for the duplicate-detection evaluation.
-		batch.set(suggestionRef(reportId, groupId), {
-			reportId,
-			candidateGroupId: groupId,
-			imageSimilarity: target.metrics.imageSimilarity,
-			distanceM: target.metrics.distanceMeters,
-			timeGapDays: target.metrics.timeGapDays,
-			combinedScore: target.metrics.combinedScore,
-			decision: decisionValues[decision],
-			reviewedBy: staff.user?.uid ?? '',
-			reviewedAt: serverTimestamp()
-		});
 
 		try {
-			await batch.commit();
+			await runTransaction(db, async (tx) => {
+				if (decision === 'merged') {
+					// Read both inside the transaction so a join, merge or status change that lands
+					// meanwhile is seen (the transaction retries if either changes).
+					const [snap, groupSnap] = await Promise.all([
+						tx.get(reportRef(reportId)),
+						tx.get(reportRef(groupId))
+					]);
+					if (!snap.exists()) throw new Error(`${reportId} no longer exists.`);
+					if (!groupSnap.exists()) throw new Error(`${groupId} no longer exists.`);
+					const fresh = snap.data();
+					const lead = groupSnap.data();
+					// Merging into a report that is itself merged would hide this one from the queue.
+					if (lead.mergedInto)
+						throw new Error(`${groupId} was merged into ${lead.mergedInto}. Review it again.`);
+					if (lead.status === 'resolved')
+						throw new Error(`${groupId} is resolved. Use "Recurrence of a fixed issue" instead.`);
+					// Another staff member merged it first; merging again would count it twice.
+					if (fresh.mergedInto)
+						throw new Error(`${reportId} was already merged into ${fresh.mergedInto}.`);
+					const reportCount: number = fresh.reportCount ?? 1;
+					// The report follows the group's status from now on, so its reporter sees progress.
+					// Its own values are kept in preMerge for unmerge.
+					const patch: Record<string, unknown> = {
+						mergedInto: groupId,
+						mergeScore: target.metrics.combinedScore.toFixed(2),
+						mergedBy: staff.displayName,
+						mergedAt: serverTimestamp(),
+						status: lead.status,
+						preMerge: {
+							status: fresh.status ?? 'received',
+							statusNote: fresh.statusNote ?? null,
+							verifiedAt: fresh.verifiedAt ?? null,
+							assignedTo: fresh.assignedTo ?? null
+						}
+					};
+					if (lead.statusNote) patch.statusNote = lead.statusNote;
+					if (lead.verifiedAt) patch.verifiedAt = lead.verifiedAt;
+					if (lead.assignedTo) patch.assignedTo = lead.assignedTo;
+					// Anything already merged into the report moves with it. Take their counts back
+					// off the report so a later unmerge subtracts only the report's own count.
+					const children = reports.childrenOf(reportId);
+					if (children.length > 0) {
+						patch.reportCount = reportCount - children.reduce((n, c) => n + c.reportCount, 0);
+					}
+					tx.update(reportRef(reportId), patch);
+					for (const child of children) {
+						// They follow the new group's status too, like the report itself.
+						tx.update(reportRef(child.id), { mergedInto: groupId, status: lead.status });
+					}
+					// reportCount on the group counts everyone in it; unmerge takes it back off.
+					tx.update(reportRef(groupId), { reportCount: increment(reportCount) });
+				} else if (decision === 'rejected') {
+					tx.update(reportRef(reportId), { notDuplicateOf: arrayUnion(groupId) });
+				} else {
+					tx.update(reportRef(reportId), { recurrenceOf: groupId });
+				}
+				// Keep the decision and the evidence for the duplicate-detection evaluation.
+				tx.set(suggestionRef(reportId, groupId), {
+					reportId,
+					candidateGroupId: groupId,
+					imageSimilarity: target.metrics.imageSimilarity,
+					distanceM: target.metrics.distanceMeters,
+					timeGapDays: target.metrics.timeGapDays,
+					combinedScore: target.metrics.combinedScore,
+					decision: decisionValues[decision],
+					reviewedBy: staff.user?.uid ?? '',
+					reviewedAt: serverTimestamp()
+				});
+			});
 			this.lastActionMessage = labels[decision];
 			// The suggestion drops out of the list; keep the position pointing at the next one.
 			if (this.currentIndex >= this.totalCount) this.currentIndex = 0;

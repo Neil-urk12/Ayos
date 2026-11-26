@@ -100,6 +100,9 @@ function buildGroup(lead: ReportDoc, drafts: Record<string, string>, now: number
 	const safetyImpact = members.some((m) => m.danger) ? 'High' : 'Medium';
 	// reportCount on the lead already includes merged reports (added on merge).
 	const count = lead.reportCount;
+	// Residents of a merged report can reopen it themselves (the rules don't let them touch
+	// the lead), so a resolved group with an unresolved member is open again.
+	const reopened = lead.status === 'resolved' && children.some((c) => c.status !== 'resolved');
 	const ageLabel = ageDays === 0 ? 'today' : `${ageDays} ${ageDays === 1 ? 'day' : 'days'} ago`;
 
 	return {
@@ -113,7 +116,7 @@ function buildGroup(lead: ReportDoc, drafts: Record<string, string>, now: number
 		reports: count,
 		ageDays,
 		score: priorityScore(severity, safetyImpact, ageDays, count),
-		status: statusLabels[lead.status] as IssueStatus,
+		status: (reopened ? 'In progress' : statusLabels[lead.status]) as IssueStatus,
 		photoCount: members.length,
 		severityScore: severity,
 		severitySelect: severityOptions[severity] ?? severityOptions[DEFAULT_SEVERITY],
@@ -261,14 +264,32 @@ class QueueState {
 		const child = reports.byId(reportCode);
 		if (!child) return;
 		const batch = writeBatch(db);
-		batch.update(reportRef(reportCode), {
+		const patch: Record<string, unknown> = {
 			mergedInto: deleteField(),
 			mergeScore: deleteField(),
 			mergedBy: deleteField(),
 			mergedAt: deleteField(),
 			// Don't suggest the same match again in duplicate review.
 			notDuplicateOf: arrayUnion(issueId)
-		});
+		};
+		// Put back the report's own status; the group's was copied over it on merge and kept in
+		// sync since. Reports merged before preMerge existed keep the group's values.
+		const pre = child.preMerge;
+		if (pre) {
+			Object.assign(patch, {
+				preMerge: deleteField(),
+				status: pre.status,
+				statusNote: pre.statusNote ?? deleteField(),
+				assignedTo: pre.assignedTo ?? deleteField(),
+				// Duplicate review never offers resolved reports, so these were never its own.
+				resolvedOn: deleteField(),
+				awaitingConfirmation: deleteField()
+			});
+			// If it was verified before the merge, verifiedAtTs is still its own; else both came later.
+			if (pre.verifiedAt) patch.verifiedAt = pre.verifiedAt;
+			else Object.assign(patch, { verifiedAt: deleteField(), verifiedAtTs: deleteField() });
+		}
+		batch.update(reportRef(reportCode), patch);
 		batch.update(reportRef(issueId), { reportCount: increment(-child.reportCount) });
 		// Undoing a merge means the match was wrong; record that for the evaluation.
 		batch.set(
