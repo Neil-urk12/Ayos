@@ -60,6 +60,8 @@ class StaffAuth {
 		this.#started = true;
 		onAuthStateChanged(auth, async (next) => {
 			const staff = next ? await hasStaffAccess(next) : false;
+			// A later auth change (e.g. sign-out) already ran; don't overwrite it with this one.
+			if (auth.currentUser !== next) return;
 			this.user = next;
 			this.isStaff = staff;
 			this.ready = true;

@@ -54,6 +54,13 @@ export interface ReportDoc {
 	mergedInto?: string;
 	mergeScore?: string;
 	mergedBy?: string;
+	/** The report's own fields before the merge copied the group's over them; restored on unmerge. */
+	preMerge?: {
+		status: StatusCode;
+		statusNote: string | null;
+		verifiedAt: string | null;
+		assignedTo: string | null;
+	};
 	/** Groups staff said this report is not a duplicate of. */
 	notDuplicateOf?: string[];
 	/** A fixed group this report was flagged as a recurrence of. */

@@ -1,3 +1,4 @@
+import { FirebaseError } from 'firebase/app';
 import type { DocumentData } from 'firebase/firestore';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { Alert } from 'react-native';
@@ -7,6 +8,7 @@ import {
   answerFix,
   createReport,
   joinReport,
+  mergedIntoOnServer,
   newReportId,
   reportErrorMessage,
   watchJoinedReportIds,
@@ -162,7 +164,22 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
     joinExisting: (id) => {
       const report = reports.find((r) => r.id === id);
       if (uid && report && !report.mine) {
-        joinReport(id, uid).catch(showWriteError('Couldn’t add your report'));
+        joinReport(id, uid).catch(async (error) => {
+          if (!(error instanceof FirebaseError && error.code === 'permission-denied')) {
+            showWriteError('Couldn’t add your report')(error);
+            return;
+          }
+          // Guests can't reach this screen, so a denial means either the user is already a
+          // supporter (the joined-ids snapshot hadn't loaded yet) or staff merged the report
+          // meanwhile. Only the second loses the join, so only that one is worth telling.
+          const group = await mergedIntoOnServer(id).catch(() => undefined);
+          if (group) {
+            Alert.alert(
+              'Couldn’t add your report',
+              `This report was just combined with ${group}. Open ${group} and add yours there.`,
+            );
+          }
+        });
       }
       return id;
     },

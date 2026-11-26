@@ -88,9 +88,11 @@
 		<!-- Action bar -->
 		<div class="action-card">
 			<div class="action-buttons">
-				<button type="button" class="btn-primary" onclick={() => duplicates.resolve('merged')}>
-					Confirm duplicate · merge into {item.existingGroup.code}
-				</button>
+				{#if item.existingGroup.status !== 'Resolved'}
+					<button type="button" class="btn-primary" onclick={() => duplicates.resolve('merged')}>
+						Confirm duplicate · merge into {item.existingGroup.code}
+					</button>
+				{/if}
 				<button type="button" class="btn-secondary" onclick={() => duplicates.resolve('rejected')}>
 					Not a duplicate
 				</button>
