@@ -6,6 +6,7 @@
 	import { staff } from '#lib/state/auth.svelte.ts';
 	import { reports } from '#lib/state/reports.svelte.ts';
 	import { settings } from '#lib/state/settings.svelte.ts';
+	import { startImageScores } from '#lib/state/duplicates.svelte.ts';
 	import '../app.css';
 
 	let { children } = $props();
@@ -26,9 +27,11 @@
 		if (!staff.signedIn) return;
 		const unsubscribe = reports.start();
 		const unsubscribeSettings = settings.start();
+		const unsubscribeImageScores = startImageScores();
 		return () => {
 			unsubscribe();
 			unsubscribeSettings();
+			unsubscribeImageScores();
 			reports.stop();
 		};
 	});

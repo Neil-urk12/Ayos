@@ -1,5 +1,14 @@
-import { SvelteSet } from 'svelte/reactivity';
-import { arrayUnion, increment, runTransaction, serverTimestamp } from 'firebase/firestore';
+import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+import {
+	arrayUnion,
+	collection,
+	increment,
+	onSnapshot,
+	query,
+	runTransaction,
+	serverTimestamp,
+	where
+} from 'firebase/firestore';
 
 import { db } from '#lib/firebase.ts';
 import { staff } from './auth.svelte.ts';
@@ -62,12 +71,39 @@ export interface DuplicateSuggestion {
 	};
 }
 
-/** Closeness in space and time, 0–1, with the weights from settings/priority. */
-function matchScore(distance: number, gapDays: number) {
-	const d = settings.current.duplicates;
-	return (
-		d.distanceWeight * (1 - distance / d.radiusMeters) + d.timeWeight * (1 - gapDays / d.windowDays)
+/**
+ * Photo similarity (0–1) per "{reportId}_{groupId}", from the pending duplicateSuggestions the
+ * on_report_created Cloud Function writes after comparing photos with its image model.
+ */
+const imageScores = new SvelteMap<string, number>();
+
+/** Starts listening for the function's photo comparisons; returns a function that stops. */
+export function startImageScores() {
+	return onSnapshot(
+		query(collection(db, 'duplicateSuggestions'), where('decision', '==', 'pending')),
+		(snap) => {
+			imageScores.clear();
+			for (const d of snap.docs) {
+				const value = d.get('imageSimilarity');
+				if (typeof value === 'number') imageScores.set(d.id, value);
+			}
+		},
+		(error) => console.warn('[duplicates] Could not load photo comparisons:', error)
 	);
+}
+
+/**
+ * Combined score, 0–1, with the weights from settings/priority. Same formula as
+ * functions/scoring.py match_score: closeness in space and time, plus photo similarity when
+ * the photos have been compared.
+ */
+function matchScore(distance: number, gapDays: number, imageSimilarity: number | null) {
+	const d = settings.current.duplicates;
+	const closeness =
+		d.distanceWeight * (1 - distance / d.radiusMeters) + d.timeWeight * (1 - gapDays / d.windowDays);
+	const total = d.imageWeight + d.distanceWeight + d.timeWeight;
+	if (imageSimilarity === null || total <= 0) return closeness;
+	return (d.imageWeight * imageSimilarity + closeness) / total;
 }
 
 /** Position on the location schematic, as a % string, relative to the new report at 50%. */
@@ -81,7 +117,8 @@ function buildSuggestion(
 	group: ReportDoc,
 	distance: number,
 	gapDays: number,
-	score: number
+	score: number,
+	imageSimilarity: number | null
 ): DuplicateSuggestion {
 	const members = [group, ...reports.childrenOf(group.id)];
 	return {
@@ -111,7 +148,7 @@ function buildSuggestion(
 		},
 		metrics: {
 			badge: group.status === 'resolved' ? 'Possible recurrence' : 'Likely duplicate',
-			imageSimilarity: null,
+			imageSimilarity,
 			distanceMeters: Math.round(distance),
 			maxRadiusMeters: settings.current.duplicates.radiusMeters,
 			timeGapDays: gapDays,
@@ -136,7 +173,13 @@ function findSuggestions(docs: ReportDoc[], skipped: ReadonlySet<string>): Dupli
 
 	for (const report of groups) {
 		if (report.status === 'resolved' || report.recurrenceOf) continue;
-		let best: { group: ReportDoc; distance: number; gapDays: number; score: number } | null = null;
+		let best: {
+			group: ReportDoc;
+			distance: number;
+			gapDays: number;
+			score: number;
+			image: number | null;
+		} | null = null;
 
 		for (const group of groups) {
 			if (group.id === report.id || group.category !== report.category) continue;
@@ -148,15 +191,16 @@ function findSuggestions(docs: ReportDoc[], skipped: ReadonlySet<string>): Dupli
 			const gapDays = Math.floor((report.createdAt.getTime() - group.createdAt.getTime()) / DAY_MS);
 			if (distance > radiusMeters || gapDays > windowDays) continue;
 
-			const score = matchScore(distance, gapDays);
+			const image = imageScores.get(`${report.id}_${group.id}`) ?? null;
+			const score = matchScore(distance, gapDays, image);
 			if (score >= threshold && (!best || score > best.score)) {
-				best = { group, distance, gapDays, score };
+				best = { group, distance, gapDays, score, image };
 			}
 		}
 
 		if (best) {
 			suggestions.push(
-				buildSuggestion(report, best.group, best.distance, best.gapDays, best.score)
+				buildSuggestion(report, best.group, best.distance, best.gapDays, best.score, best.image)
 			);
 		}
 	}
