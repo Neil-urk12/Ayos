@@ -7,8 +7,10 @@ service firebase.storage {
       allow read: if request.auth != null;
 
       // Uploads must be images under 10 MB. request.resource only exists on create/update.
+      // Guests (anonymous auth) can't file reports, so they can't upload report photos either.
       allow create, update: if request.auth != null
         && request.auth.uid == uid
+        && request.auth.token.firebase.sign_in_provider != 'anonymous'
         && request.resource.size < 10 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
 
