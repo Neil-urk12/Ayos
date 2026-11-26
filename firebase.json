@@ -31,6 +31,17 @@
     },
     "hosting": {
       "port": 5000
+    },
+    "functions": {
+      "port": 5001
     }
-  }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "runtime": "python313",
+      "ignore": ["venv", ".git", "__pycache__", "tests", "scripts", "*.log"]
+    }
+  ]
 }
