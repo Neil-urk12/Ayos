@@ -116,10 +116,14 @@ service cloud.firestore {
       allow update: if
         // Staff manage status, notes and assignment.
         isStaff()
-        // The reporter may edit their own text. reporterId, status and counts stay locked.
-        || (isOwner(resource.data.reporterId) && changedOnly(['description', 'danger'])
+        // The reporter may edit their own text and set the small thumbnail of their first
+        // photo (src/lib/firebase/photos.ts, written after the report is created).
+        // reporterId, status and counts stay locked.
+        || (isOwner(resource.data.reporterId)
+          && changedOnly(['description', 'danger', 'thumbnail'])
           && validText(request.resource.data.description, 2000)
-          && request.resource.data.danger is bool)
+          && request.resource.data.danger is bool
+          && validText(request.resource.data.get('thumbnail', ''), 60000))
         // Joining: bump reportCount by exactly 1 in the same batch that creates your
         // supporters/{uid} doc, so each person counts once. Not on a merged report: its
         // group's reportCount wouldn't include the join.
@@ -146,6 +150,24 @@ service cloud.firestore {
 
       allow delete: if isStaff()
         || (isOwner(resource.data.reporterId) && resource.data.status == 'received');
+
+      // reports/{reportId}/photos/{uid}_{n}: report photos as JPEG data URIs (kept in Firestore
+      // so the project can stay on the Spark plan). Anyone who filed or joined the report may
+      // add up to 3 of their own; the fixed ids are what cap the count.
+      match /photos/{photoId} {
+        allow read: if signedIn();
+        allow create: if isResident()
+          && photoId in [request.auth.uid + '_0', request.auth.uid + '_1', request.auth.uid + '_2']
+          && exists(supporterPath(reportId))
+          && request.resource.data.keys().hasOnly(['uid', 'data', 'createdAt'])
+          && request.resource.data.keys().hasAll(['uid', 'data', 'createdAt'])
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.data is string
+          && request.resource.data.data.size() <= 900000
+          && request.resource.data.createdAt == request.time;
+        allow delete: if isStaff()
+          || (signedIn() && resource.data.uid == request.auth.uid);
+      }
 
       // reports/{reportId}/supporters/{uid}: one doc per resident who joined the report.
       match /supporters/{uid} {
