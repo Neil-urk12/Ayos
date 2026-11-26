@@ -1,6 +1,9 @@
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -23,6 +26,7 @@ import {
   draftLocation,
   formatTime,
   type Category,
+  type DraftPhoto,
   type ReportDraft,
 } from '../data/reports';
 import { useAuth } from '../data/auth-store';
@@ -30,12 +34,44 @@ import { useReports } from '../data/reports-store';
 
 const MAX_PHOTOS = 3;
 
+// Photos are shrunk again before saving (lib/firebase/photos.ts), so full quality isn't needed.
+const PICKER_OPTIONS: ImagePicker.ImagePickerOptions = {
+  mediaTypes: ['images'],
+  quality: 0.6,
+  exif: false,
+};
+
+/** Opens the camera, or the photo library when `fromLibrary`; null if cancelled or refused. */
+async function pickPhoto(fromLibrary: boolean): Promise<DraftPhoto | null> {
+  if (!fromLibrary) {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(
+        'Camera access needed',
+        'Allow camera access in Settings to take a photo, or choose one from your library.',
+      );
+      return null;
+    }
+  }
+  const result = fromLibrary
+    ? await ImagePicker.launchImageLibraryAsync(PICKER_OPTIONS)
+    : await ImagePicker.launchCameraAsync(PICKER_OPTIONS);
+  const asset = result.canceled ? undefined : result.assets[0];
+  if (!asset) return null;
+  return {
+    uri: asset.uri,
+    width: asset.width,
+    height: asset.height,
+    takenAt: formatTime(new Date()),
+  };
+}
+
 export default function CreateReportScreen() {
   const insets = useSafeAreaInsets();
   const { saveDraft, findSimilar, submitNew } = useReports();
   const { isGuest } = useAuth();
 
-  const [photos, setPhotos] = useState<string[]>(() => [formatTime(new Date())]);
+  const [photos, setPhotos] = useState<DraftPhoto[]>([]);
   const [category, setCategory] = useState<Category | null>(null);
   const [description, setDescription] = useState('');
   const [danger, setDanger] = useState(false);
@@ -58,6 +94,42 @@ export default function CreateReportScreen() {
     );
   }
 
+  const addPhoto = (fromLibrary: boolean) => {
+    pickPhoto(fromLibrary)
+      .then((photo) => {
+        if (photo) setPhotos((current) => [...current, photo].slice(0, MAX_PHOTOS));
+      })
+      .catch((error) => {
+        console.warn('[create-report] Could not add photo:', error);
+        Alert.alert('Couldn’t add the photo', 'Please try again.');
+      });
+  };
+
+  const choosePhotoSource = () => {
+    // The camera isn't available in the browser, and web alerts have no buttons.
+    if (Platform.OS === 'web') {
+      addPhoto(true);
+      return;
+    }
+    Alert.alert('Add a photo', undefined, [
+      { text: 'Take photo', onPress: () => addPhoto(false) },
+      { text: 'Choose from library', onPress: () => addPhoto(true) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const removePhoto = (index: number) => {
+    const remove = () => setPhotos((current) => current.filter((_, i) => i !== index));
+    if (Platform.OS === 'web') {
+      remove();
+      return;
+    }
+    Alert.alert('Remove this photo?', undefined, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: remove },
+    ]);
+  };
+
   const send = () => {
     if (!category) return;
     const draft: ReportDraft = {
@@ -67,7 +139,7 @@ export default function CreateReportScreen() {
       street: draftLocation.street,
       area: draftLocation.area,
       accuracy: draftLocation.accuracy,
-      photoTakenAt: photos[0],
+      photos,
     };
     saveDraft(draft);
 
@@ -97,29 +169,40 @@ export default function CreateReportScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.photos}
             >
-              {photos.map((takenAt, index) => (
-                <View
-                  key={`${takenAt}-${index}`}
-                  style={styles.photo}
-                  accessibilityLabel={`Photo ${index + 1}, taken ${takenAt}`}
+              {photos.map((photo, index) => (
+                <Pressable
+                  key={photo.uri}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Photo ${index + 1}, taken ${photo.takenAt}`}
+                  accessibilityHint="Removes this photo"
+                  onPress={() => removePhoto(index)}
+                  style={({ pressed }) => [styles.photo, pressed && styles.pressed]}
                 >
-                  <Icon name="image" size={34} color="#5B6170" />
-                  <Text style={styles.photoBadge}>Taken {takenAt}</Text>
-                </View>
+                  <Image
+                    source={{ uri: photo.uri }}
+                    style={StyleSheet.absoluteFill}
+                    contentFit="cover"
+                  />
+                  <Text style={styles.photoBadge}>Taken {photo.takenAt}</Text>
+                </Pressable>
               ))}
               {photos.length < MAX_PHOTOS && (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Add another angle"
-                  onPress={() => setPhotos((current) => [...current, formatTime(new Date())])}
+                  accessibilityLabel={photos.length === 0 ? 'Add a photo' : 'Add another angle'}
+                  onPress={choosePhotoSource}
                   style={({ pressed }) => [styles.addPhoto, pressed && styles.pressed]}
                 >
                   <Icon name="camera" size={26} color={colors.textSecondary} />
-                  <Text style={styles.addPhotoText}>Add angle</Text>
+                  <Text style={styles.addPhotoText}>
+                    {photos.length === 0 ? 'Add photo' : 'Add angle'}
+                  </Text>
                 </Pressable>
               )}
             </ScrollView>
-            <Text style={styles.hint}>Avoid faces and plate numbers. Up to 3 photos.</Text>
+            <Text style={styles.hint}>
+              Avoid faces and plate numbers. Up to 3 photos. Tap a photo to remove it.
+            </Text>
           </View>
 
           <View style={styles.field}>
@@ -237,6 +320,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.photo,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   photoBadge: {
     position: 'absolute',

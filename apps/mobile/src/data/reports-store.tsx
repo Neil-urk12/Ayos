@@ -15,6 +15,7 @@ import {
   watchReports,
   type ReportSnapshot,
 } from '../lib/firebase/reports';
+import { savePhotos, saveThumbnail } from '../lib/firebase/photos';
 import { useAuth } from './auth-store';
 import {
   categoryLabels,
@@ -71,6 +72,7 @@ function toReport(id: string, data: DocumentData, mine: boolean): Report {
     danger: data.danger,
     description: data.description,
     photoTone: data.photoTone ?? colors.photo,
+    thumbnail: typeof data.thumbnail === 'string' ? data.thumbnail : undefined,
     map,
     mergedInto: data.mergedInto,
   };
@@ -78,6 +80,16 @@ function toReport(id: string, data: DocumentData, mine: boolean): Report {
 
 function createdMs(data: DocumentData): number {
   return data.createdAt?.toMillis?.() ?? Date.now();
+}
+
+const PHOTO_UPLOAD_ERROR = 'Couldn’t save your photos';
+
+function showPhotoError(error: unknown) {
+  console.warn(`[reports] ${PHOTO_UPLOAD_ERROR}:`, error);
+  Alert.alert(
+    PHOTO_UPLOAD_ERROR,
+    'Your report was sent without them. Check your connection and try again later.',
+  );
 }
 
 function showWriteError(title: string) {
@@ -145,7 +157,8 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
       if (!uid) return id;
       const now = new Date();
       // The write shows up in the reports snapshot straight away (pending), so the
-      // report screen can open on it before the server confirms.
+      // report screen can open on it before the server confirms. Photos are saved once
+      // the server has the report, since the rules check that the user is its supporter.
       createReport(id, uid, {
         title: `${categoryLabels[draft.category]} on ${draft.street}`,
         category: draft.category,
@@ -158,28 +171,45 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
         photoTone: colors.photo,
         map: draftLocation.map,
         accuracy: draft.accuracy,
-      }).catch(showWriteError('Couldn’t send your report'));
+      })
+        .then(async () => {
+          const [first] = draft.photos;
+          if (!first) return;
+          await Promise.all([savePhotos(id, uid, draft.photos), saveThumbnail(id, first)]).catch(
+            showPhotoError,
+          );
+        })
+        .catch(showWriteError('Couldn’t send your report'));
       return id;
     },
     joinExisting: (id) => {
       const report = reports.find((r) => r.id === id);
       if (uid && report && !report.mine) {
-        joinReport(id, uid).catch(async (error) => {
-          if (!(error instanceof FirebaseError && error.code === 'permission-denied')) {
-            showWriteError('Couldn’t add your report')(error);
-            return;
-          }
-          // Guests can't reach this screen, so a denial means either the user is already a
-          // supporter (the joined-ids snapshot hadn't loaded yet) or staff merged the report
-          // meanwhile. Only the second loses the join, so only that one is worth telling.
-          const group = await mergedIntoOnServer(id).catch(() => undefined);
-          if (group) {
-            Alert.alert(
-              'Couldn’t add your report',
-              `This report was just combined with ${group}. Open ${group} and add yours there.`,
-            );
-          }
-        });
+        const photos = draft?.photos ?? [];
+        joinReport(id, uid)
+          .then(
+            async () => {
+              // The report keeps the reporter's thumbnail; the joiner's photos still reach the LGU.
+              await savePhotos(id, uid, photos);
+            },
+            async (error) => {
+              if (!(error instanceof FirebaseError && error.code === 'permission-denied')) {
+                showWriteError('Couldn’t add your report')(error);
+                return;
+              }
+              // Guests can't reach this screen, so a denial means either the user is already a
+              // supporter (the joined-ids snapshot hadn't loaded yet) or staff merged the report
+              // meanwhile. Only the second loses the join, so only that one is worth telling.
+              const group = await mergedIntoOnServer(id).catch(() => undefined);
+              if (group) {
+                Alert.alert(
+                  'Couldn’t add your report',
+                  `This report was just combined with ${group}. Open ${group} and add yours there.`,
+                );
+              }
+            },
+          )
+          .catch(showPhotoError);
       }
       return id;
     },

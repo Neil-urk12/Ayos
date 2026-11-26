@@ -140,6 +140,7 @@ export default function MapScreen() {
                   report.reportCount === 1 ? 'report' : 'reports'
                 }`}
                 photoTone={report.photoTone}
+                photoUri={report.thumbnail}
                 trailing={<StatusBadge status={report.status} />}
                 onPress={() => openReport(report)}
               />

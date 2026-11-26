@@ -8,6 +8,7 @@ type ReportRowProps = {
   title: string;
   meta: string;
   photoTone: string;
+  photoUri?: string;
   trailing?: ReactNode;
   /** Rendered under the meta line. */
   footer?: ReactNode;
@@ -21,6 +22,7 @@ export function ReportRow({
   title,
   meta,
   photoTone,
+  photoUri,
   trailing,
   footer,
   thumbSize = 52,
@@ -33,7 +35,7 @@ export function ReportRow({
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
-      <PhotoThumb tone={photoTone} size={thumbSize} showIcon={showPhotoIcon} />
+      <PhotoThumb uri={photoUri} tone={photoTone} size={thumbSize} showIcon={showPhotoIcon} />
       <View style={styles.body}>
         <Text style={styles.title} numberOfLines={2}>
           {title}

@@ -50,11 +50,17 @@ export default function DuplicateCheckScreen() {
         <View style={styles.matchCard}>
           <View style={styles.compare}>
             <View style={styles.compareHalf}>
-              <PhotoThumb tone="#DBD8D3" showIcon={false} style={styles.comparePhoto} />
+              <PhotoThumb
+                uri={draft.photos[0]?.uri}
+                tone="#DBD8D3"
+                showIcon={false}
+                style={styles.comparePhoto}
+              />
               <Text style={styles.photoTag}>Yours</Text>
             </View>
             <View style={styles.compareHalf}>
               <PhotoThumb
+                uri={match.report.thumbnail}
                 tone={match.report.photoTone}
                 showIcon={false}
                 style={styles.comparePhoto}
@@ -83,7 +89,7 @@ export default function DuplicateCheckScreen() {
 
         {others.map(({ report, distance }) => (
           <View key={report.id} style={styles.otherCard}>
-            <PhotoThumb tone={report.photoTone} showIcon={false} size={52} />
+            <PhotoThumb uri={report.thumbnail} tone={report.photoTone} showIcon={false} size={52} />
             <View style={styles.otherBody}>
               <Text style={styles.otherTitle}>{report.title}</Text>
               <Text style={styles.otherMeta}>

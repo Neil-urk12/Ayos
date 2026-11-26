@@ -93,7 +93,7 @@ export default function ReportScreen() {
         )}
 
         <View style={[styles.card, styles.summary]}>
-          <PhotoThumb tone={report.photoTone} size={72} showIcon={false} />
+          <PhotoThumb uri={report.thumbnail} tone={report.photoTone} size={72} showIcon={false} />
           <View style={styles.summaryBody}>
             <Text style={styles.summaryTitle}>{report.title}</Text>
             <Text style={styles.summaryMeta}>
