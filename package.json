@@ -6,7 +6,7 @@
     "web": "pnpm --filter web dev",
     "set-staff": "pnpm --filter web set-staff",
     "seed": "pnpm --filter web seed",
-    "test:rules": "firebase emulators:exec --project demo-ayos --only firestore,storage \"pnpm --filter rules test\"",
+    "test:rules": "npx -y firebase-tools@15 emulators:exec --project demo-ayos --only firestore,storage \"pnpm --filter rules test\"",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
     "lint": "pnpm -r lint"
