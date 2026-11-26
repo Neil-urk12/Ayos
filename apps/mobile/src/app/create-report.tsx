@@ -162,6 +162,17 @@ export default function CreateReportScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          {/* FR-14: safe-reporting reminder, before anything else on the form. */}
+          <View style={styles.safety} accessibilityRole="alert">
+            <Icon name="shield" size={22} color={colors.primary} />
+            <View style={styles.safetyText}>
+              <Text style={styles.safetyTitle}>Report only when it’s safe</Text>
+              <Text style={styles.safetyBody}>
+                Pull over before using your phone, and stay off the road while taking photos.
+              </Text>
+            </View>
+          </View>
+
           <View style={styles.field}>
             <FieldLabel required>Photo</FieldLabel>
             <ScrollView
@@ -309,6 +320,16 @@ const styles = StyleSheet.create({
   guest: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 14 },
   guestText: { ...type.body, color: colors.textSecondary, textAlign: 'center', maxWidth: 280 },
   content: { padding: 16, paddingTop: 20, gap: 26 },
+  safety: {
+    flexDirection: 'row',
+    gap: 12,
+    padding: 14,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primarySoft,
+  },
+  safetyText: { flex: 1, gap: 2 },
+  safetyTitle: { fontFamily: fonts.semibold, fontSize: 15.5, color: colors.text },
+  safetyBody: { ...type.meta, fontSize: 14, lineHeight: 19, color: colors.textSecondary },
   field: { gap: 10 },
   label: { ...type.label, fontSize: 16 },
   required: { color: colors.danger },

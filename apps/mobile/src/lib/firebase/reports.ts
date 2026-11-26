@@ -34,6 +34,17 @@ export type NewReportFields = {
   photoTone: string;
   map: { x: number; y: number };
   accuracy: number;
+  /** Set when the resident saw a similar report and said it's a different problem (FR-10). */
+  similarHint?: { reportId: string; choice: 'different' };
+};
+
+/** A resident's answer to "Is it still there?" (FR-11). */
+export type Confirmation = 'still_there' | 'fixed';
+
+/** The counter on the report that each answer adds to. Must match firestore.rules. */
+export const confirmationCountField: Record<Confirmation, 'confirmStillThere' | 'confirmFixed'> = {
+  still_there: 'confirmStillThere',
+  fixed: 'confirmFixed',
 };
 
 export type ReportSnapshot = { id: string; data: DocumentData };
@@ -41,6 +52,8 @@ export type ReportSnapshot = { id: string; data: DocumentData };
 const reportRef = (id: string) => doc(db, collections.reports, id);
 const supporterRef = (reportId: string, uid: string) =>
   doc(db, collections.reports, reportId, collections.supporters, uid);
+const confirmationRef = (reportId: string, uid: string) =>
+  doc(db, collections.reports, reportId, collections.confirmations, uid);
 
 const ID_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -95,12 +108,40 @@ export function createReport(id: string, uid: string, fields: NewReportFields) {
   return batch.commit();
 }
 
-/** Adds the user to an existing report: reportCount + 1 alongside their supporters/{uid} doc. */
+/**
+ * Adds the user to an existing report: reportCount + 1 alongside their supporters/{uid} doc.
+ * similarHint 'same' records that they said it "looks the same" on the duplicate check (FR-10).
+ */
 export function joinReport(id: string, uid: string) {
   const batch = writeBatch(db);
   batch.update(reportRef(id), { reportCount: increment(1) });
-  batch.set(supporterRef(id, uid), { uid, joinedAt: serverTimestamp() });
+  batch.set(supporterRef(id, uid), { uid, joinedAt: serverTimestamp(), similarHint: 'same' });
   return batch.commit();
+}
+
+/**
+ * Records the user's one answer for an issue group (its lead report) and adds it to the count,
+ * in one batch as the rules require. A second answer from the same user is refused.
+ */
+export function confirmIssue(groupId: string, uid: string, value: Confirmation) {
+  const batch = writeBatch(db);
+  batch.set(confirmationRef(groupId, uid), { uid, value, createdAt: serverTimestamp() });
+  batch.update(reportRef(groupId), { [confirmationCountField[value]]: increment(1) });
+  return batch.commit();
+}
+
+/** Calls back with the user's answer for an issue group, or null if they haven't answered. */
+export function watchConfirmation(
+  groupId: string,
+  uid: string,
+  onChange: (value: Confirmation | null) => void,
+  onError: (error: Error) => void,
+): Unsubscribe {
+  return onSnapshot(
+    confirmationRef(groupId, uid),
+    (snap) => onChange(snap.exists() ? (snap.data().value as Confirmation) : null),
+    onError,
+  );
 }
 
 /** The report this one was merged into, if any, read from the server (not the local copy). */

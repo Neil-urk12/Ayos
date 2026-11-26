@@ -10,10 +10,11 @@ import {
   updateProfile,
   type User,
 } from 'firebase/auth';
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { auth } from '../lib/firebase';
 import { createUserProfile, watchUserProfile, type UserProfile } from '../lib/firebase/users';
+import { registerForPushNotifications, unregisterPushToken } from '../lib/notifications';
 
 export type SignUpInput = {
   fullName: string;
@@ -95,6 +96,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
   }, [user]);
 
+  // This phone's FCM token, saved on the signed-in user's profile so they get status updates.
+  const pushToken = useRef<{ uid: string; token: string } | null>(null);
+  const hasProfile = profile !== null;
+  useEffect(() => {
+    // Needs the users/{uid} document to exist, so wait for the profile. Guests have none.
+    if (!user || user.isAnonymous || signingUp || !hasProfile) return;
+    const uid = user.uid;
+    let cancelled = false;
+    registerForPushNotifications(uid)
+      .then((token) => {
+        if (!cancelled && token) pushToken.current = { uid, token };
+      })
+      .catch((error) => console.warn('[auth] Could not turn on notifications:', error));
+    return () => {
+      cancelled = true;
+    };
+  }, [user, signingUp, hasProfile]);
+
   const value: AuthContextValue = {
     user,
     signedIn: user !== null && !signingUp,
@@ -143,7 +162,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSigningUp(false);
       }
     },
-    signOut: () => firebaseSignOut(auth),
+    signOut: async () => {
+      // Stop notifications to this phone first: once signed out, the profile can't be written.
+      const saved = pushToken.current;
+      pushToken.current = null;
+      if (saved) await unregisterPushToken(saved.uid, saved.token).catch(() => undefined);
+      await firebaseSignOut(auth);
+    },
     resetPassword: (email) => sendPasswordResetEmail(auth, email.trim()),
   };
 

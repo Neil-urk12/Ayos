@@ -1,4 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -7,8 +8,10 @@ import { Icon } from '../../components/ayos/icon';
 import { PhotoThumb } from '../../components/ayos/photo-thumb';
 import { ScreenHeader } from '../../components/ayos/screen-header';
 import { colors, fonts, radius, type } from '../../constants/design';
+import { useAuth } from '../../data/auth-store';
 import { categoryLabels, othersCount, statusLabels, type Report } from '../../data/reports';
 import { useReports } from '../../data/reports-store';
+import { watchConfirmation, type Confirmation } from '../../lib/firebase/reports';
 
 type StepState = 'done' | 'current' | 'pending';
 type Step = { title: string; detail: string; state: StepState };
@@ -103,6 +106,8 @@ export default function ReportScreen() {
           </View>
         </View>
 
+        <ConfirmCard report={report} />
+
         <View style={[styles.card, styles.progress]}>
           <Text style={styles.progressTitle} accessibilityRole="header">
             Progress
@@ -127,6 +132,71 @@ export default function ReportScreen() {
         />
         <Button label="Share update" onPress={share} style={styles.footerButton} />
       </View>
+    </View>
+  );
+}
+
+const answerLabels: Record<Confirmation, string> = {
+  still_there: 'You said it’s still there.',
+  fixed: 'You said it’s fixed.',
+};
+
+/**
+ * "Is it still there?" (FR-11). One answer per person per issue group: merged reports count
+ * toward the group they were merged into. Guests see the counts but can't answer.
+ */
+function ConfirmCard({ report }: { report: Report }) {
+  const { user, isGuest } = useAuth();
+  const { getReport, confirmIssue } = useReports();
+  const groupId = report.mergedInto ?? report.id;
+  const group = getReport(groupId) ?? report;
+  const uid = user && !isGuest ? user.uid : null;
+  const [answer, setAnswer] = useState<{ key: string; value: Confirmation | null } | null>(null);
+  const key = `${groupId}/${uid}`;
+
+  useEffect(() => {
+    if (!uid) return;
+    return watchConfirmation(
+      groupId,
+      uid,
+      (value) => setAnswer({ key: `${groupId}/${uid}`, value }),
+      (error) => console.warn('[report] Could not load your answer:', error.message),
+    );
+  }, [groupId, uid]);
+
+  const mine = answer && answer.key === key ? answer.value : undefined;
+  const counts = `${group.confirmStillThere} still there · ${group.confirmFixed} fixed`;
+
+  return (
+    <View style={[styles.card, styles.confirm]}>
+      <Text style={[styles.progressTitle, styles.confirmTitle]} accessibilityRole="header">
+        Is it still there?
+      </Text>
+      <Text style={styles.summaryMeta}>{counts}</Text>
+      {!uid ? (
+        <Text style={styles.summaryMeta}>Sign in with an account to answer.</Text>
+      ) : mine === undefined ? null : mine ? (
+        <Text style={styles.confirmDone} accessibilityRole="text">
+          {answerLabels[mine]} Thanks for letting the LGU know.
+        </Text>
+      ) : (
+        <View style={styles.confirmButtons}>
+          <Button
+            label="Still there"
+            variant="secondary"
+            size="md"
+            onPress={() => confirmIssue(groupId, 'still_there')}
+            style={styles.footerButton}
+          />
+          <Button
+            label="It’s fixed"
+            variant="secondary"
+            size="md"
+            onPress={() => confirmIssue(groupId, 'fixed')}
+            style={styles.footerButton}
+          />
+        </View>
+      )}
     </View>
   );
 }
@@ -175,6 +245,10 @@ const DOT = 30;
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   missing: { padding: 20 },
+  confirm: { padding: 16, gap: 8 },
+  confirmTitle: { marginBottom: 0 },
+  confirmButtons: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  confirmDone: { fontFamily: fonts.medium, fontSize: 15, color: colors.success },
   content: { padding: 16, gap: 16 },
   banner: {
     flexDirection: 'row',

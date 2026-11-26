@@ -12,6 +12,8 @@ export const collections = {
   supporters: 'supporters',
   /** Subcollection under reports/{id}: one doc per photo, stored as a base64 data URI. */
   photos: 'photos',
+  /** Subcollection under reports/{id}: one "still there" / "fixed" answer per resident (FR-11). */
+  confirmations: 'confirmations',
   /** Road safety tips shown on the Safety tips tab. */
   tips: 'tips',
 } as const;

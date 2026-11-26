@@ -30,6 +30,9 @@ export type Report = {
   thumbnail?: string;
   /** Position on the neighbourhood map, as fractions of its width and height. */
   map: { x: number; y: number };
+  /** How many residents said it's still there / fixed (FR-11), counted on the group's lead. */
+  confirmStillThere: number;
+  confirmFixed: number;
   /** Set by LGU staff when they merge this report into another report's group. */
   mergedInto?: string;
 };

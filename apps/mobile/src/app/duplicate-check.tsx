@@ -28,7 +28,8 @@ export default function DuplicateCheckScreen() {
     router.push({ pathname: '/report/[id]', params: { id, sent: '1' } });
   };
 
-  const submitAsNew = () => showReport(submitNew(draft));
+  // Remembered as a hint for LGU staff: the user saw this match and said it's different.
+  const submitAsNew = () => showReport(submitNew(draft, match?.report.id));
 
   if (!match) {
     return <Redirect href="/create-report" />;
