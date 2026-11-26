@@ -26,6 +26,8 @@ export type Report = {
   danger?: boolean;
   description?: string;
   photoTone: string;
+  /** Small data URI of the reporter's first photo (reports/{id}.thumbnail), once saved. */
+  thumbnail?: string;
   /** Position on the neighbourhood map, as fractions of its width and height. */
   map: { x: number; y: number };
   /** Set by LGU staff when they merge this report into another report's group. */
@@ -39,7 +41,16 @@ export type ReportDraft = {
   street: string;
   area: string;
   accuracy: number;
-  photoTakenAt: string;
+  photos: DraftPhoto[];
+};
+
+/** A photo picked on the device, not uploaded yet. */
+export type DraftPhoto = {
+  uri: string;
+  width?: number;
+  height?: number;
+  /** Time it was added, e.g. "9:41 AM". */
+  takenAt: string;
 };
 
 export const categoryLabels: Record<Category, string> = {
