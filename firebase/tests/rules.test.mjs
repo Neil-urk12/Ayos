@@ -435,3 +435,91 @@ describe('storage', () => {
     await assertFails(uploadBytes(photo, new Uint8Array([1, 2, 3]), { contentType: 'image/jpeg' }));
   });
 });
+
+describe('report photos', () => {
+  const dataUri = 'data:image/jpeg;base64,' + 'A'.repeat(1000);
+  const photo = (uid) => ({ uid, data: dataUri, createdAt: serverTimestamp() });
+  const photoRef = (db, reportId, id) => doc(db, 'reports', reportId, 'photos', id);
+
+  it('a reporter can save photos on their own report', async () => {
+    const db = resident('alice').firestore();
+    await assertSucceeds(setDoc(photoRef(db, ALICE_REPORT, 'alice_0'), photo('alice')));
+    await assertSucceeds(setDoc(photoRef(db, ALICE_REPORT, 'alice_2'), photo('alice')));
+  });
+
+  it('a reporter can set the thumbnail on their own report', async () => {
+    await assertSucceeds(
+      updateDoc(doc(resident('alice').firestore(), 'reports', ALICE_REPORT), {
+        thumbnail: dataUri,
+      }),
+    );
+  });
+
+  it('nobody else can set the thumbnail', async () => {
+    await assertFails(
+      updateDoc(doc(resident('bob').firestore(), 'reports', ALICE_REPORT), { thumbnail: dataUri }),
+    );
+    await assertFails(
+      updateDoc(doc(guest().firestore(), 'reports', ALICE_REPORT), { thumbnail: dataUri }),
+    );
+  });
+
+  it('a thumbnail cannot be huge', async () => {
+    await assertFails(
+      updateDoc(doc(resident('alice').firestore(), 'reports', ALICE_REPORT), {
+        thumbnail: 'A'.repeat(60001),
+      }),
+    );
+  });
+
+  it('at most 3 photos per person, under their own id', async () => {
+    const db = resident('alice').firestore();
+    await assertFails(setDoc(photoRef(db, ALICE_REPORT, 'alice_3'), photo('alice')));
+    await assertFails(setDoc(photoRef(db, ALICE_REPORT, 'bob_0'), photo('alice')));
+    await assertFails(setDoc(photoRef(db, ALICE_REPORT, 'alice_0'), photo('bob')));
+  });
+
+  it('a photo cannot be larger than the limit', async () => {
+    await assertFails(
+      setDoc(photoRef(resident('alice').firestore(), ALICE_REPORT, 'alice_0'), {
+        ...photo('alice'),
+        data: 'A'.repeat(900001),
+      }),
+    );
+  });
+
+  it('a resident who did not file or join the report cannot add photos', async () => {
+    await assertFails(
+      setDoc(photoRef(resident('bob').firestore(), ALICE_REPORT, 'bob_0'), photo('bob')),
+    );
+  });
+
+  it('a joiner can add photos after joining', async () => {
+    const db = resident('bob').firestore();
+    await assertSucceeds(joinReport(db, ALICE_REPORT, 'bob'));
+    await assertSucceeds(setDoc(photoRef(db, ALICE_REPORT, 'bob_0'), photo('bob')));
+  });
+
+  it('a guest cannot add photos', async () => {
+    await assertFails(
+      setDoc(photoRef(guest().firestore(), ALICE_REPORT, 'guest_0'), photo('guest')),
+    );
+  });
+
+  it('photos cannot be edited, and only the owner or staff can delete them', async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      setDoc(photoRef(ctx.firestore(), ALICE_REPORT, 'alice_0'), { uid: 'alice', data: dataUri }),
+    );
+    await assertFails(
+      updateDoc(photoRef(resident('alice').firestore(), ALICE_REPORT, 'alice_0'), { data: 'x' }),
+    );
+    await assertFails(deleteDoc(photoRef(resident('bob').firestore(), ALICE_REPORT, 'alice_0')));
+    await assertSucceeds(deleteDoc(photoRef(claimStaff().firestore(), ALICE_REPORT, 'alice_0')));
+  });
+
+  it('guests can view report photos', async () => {
+    await assertSucceeds(
+      getDocs(collection(guest().firestore(), 'reports', ALICE_REPORT, 'photos')),
+    );
+  });
+});
