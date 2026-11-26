@@ -105,6 +105,7 @@ export default function MyReportsScreen() {
                 title={report.title}
                 meta={metaFor(report)}
                 photoTone={report.photoTone}
+                photoUri={report.thumbnail}
                 thumbSize={56}
                 showPhotoIcon={false}
                 footer={
