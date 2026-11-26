@@ -1,11 +1,12 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { staff } from '#lib/state/auth.svelte.ts';
 	import { duplicates } from '#lib/state/duplicates.svelte.ts';
 
 	interface NavItem {
 		label: string;
-		href: string;
+		href: '/' | '/duplicates' | '/reports' | '/analytics' | '/weights';
 		badge?: number;
 	}
 
@@ -60,9 +61,7 @@
 	<nav class="nav">
 		{#each navItems as item (item.href)}
 			{@const active = page.url.pathname === item.href}
-			<!-- shortcut: /reports, /analytics, /weights don't exist yet and resolve() only accepts real routes; use resolve() once they do. -->
-			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-			<a href={item.href} class="nav-link" class:active>
+			<a href={resolve(item.href)} class="nav-link" class:active>
 				<span>{item.label}</span>
 				{#if item.badge !== undefined}
 					<span class="badge">{item.badge}</span>

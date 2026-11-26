@@ -9,6 +9,8 @@ import { db } from '#lib/firebase.ts';
  */
 export const DEFAULT_SETTINGS = {
 	weights: { severity: 0.35, safety: 0.3, age: 0.15, reports: 0.2 },
+	/** Priority score at or above which an issue counts as critical. */
+	criticalThreshold: 80,
 	duplicates: {
 		/** Reports further apart than this are never suggested. */
 		radiusMeters: 30,
@@ -40,6 +42,7 @@ function merge(data: Record<string, unknown> | undefined): Settings {
 			age: num(w.age, dw.age),
 			reports: num(w.reports, dw.reports)
 		},
+		criticalThreshold: num(data?.criticalThreshold, DEFAULT_SETTINGS.criticalThreshold),
 		duplicates: {
 			radiusMeters: num(d.radiusMeters, dd.radiusMeters),
 			windowDays: num(d.windowDays, dd.windowDays),
@@ -52,12 +55,17 @@ function merge(data: Record<string, unknown> | undefined): Settings {
 
 class SettingsState {
 	current = $state<Settings>(DEFAULT_SETTINGS);
+	/** True once Firestore has answered; until then `current` is only the defaults. */
+	loaded = $state(false);
 
 	/** Starts listening; returns a function that stops. Call once signed in as staff. */
 	start() {
 		return onSnapshot(
 			doc(db, 'settings', 'priority'),
-			(snap) => (this.current = merge(snap.data())),
+			(snap) => {
+				this.current = merge(snap.data());
+				this.loaded = true;
+			},
 			(error) => {
 				console.warn('[settings] Could not load settings; using defaults:', error);
 				this.current = DEFAULT_SETTINGS;

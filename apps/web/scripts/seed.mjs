@@ -14,6 +14,7 @@ import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 // Keep in sync with DEFAULT_SETTINGS in src/lib/state/settings.svelte.ts.
 const DEFAULT_SETTINGS = {
 	weights: { severity: 0.35, safety: 0.3, age: 0.15, reports: 0.2 },
+	criticalThreshold: 80,
 	duplicates: {
 		radiusMeters: 30,
 		windowDays: 30,

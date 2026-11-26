@@ -32,6 +32,7 @@ interface WindowDataset {
 	trend: DailyVolumePoint[];
 }
 
+// shortcut: hardcoded sample figures (the page says so), compute from reports.svelte.ts once analytics is specced.
 const DATASETS: Record<TimeWindow, WindowDataset> = {
 	'7d': {
 		totalReports: 54,

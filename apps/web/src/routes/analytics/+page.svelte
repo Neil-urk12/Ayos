@@ -18,18 +18,19 @@
 		<p class="subtitle">
 			Triage throughput, duplicate consolidation, and issue distribution across engineering categories.
 		</p>
+		<p class="sample-note" role="note">Sample data: these figures are placeholders, not live reports.</p>
 	</div>
 
 	<div class="controls">
 		<select bind:value={analytics.window} aria-label="Time window" class="select">
-			{#each windows as win}
+			{#each windows as win (win.value)}
 				<option value={win.value}>{win.label}</option>
 			{/each}
 		</select>
 
 		<select bind:value={analytics.selectedCategory} aria-label="Category filter" class="select">
 			<option value="ALL">All categories</option>
-			{#each analytics.data.categories as cat}
+			{#each analytics.data.categories as cat (cat.category)}
 				<option value={cat.category}>{cat.category}</option>
 			{/each}
 		</select>
@@ -75,7 +76,7 @@
 		</div>
 
 		<div class="category-list">
-			{#each analytics.visibleCategories as item}
+			{#each analytics.visibleCategories as item (item.category)}
 				{@const sharePct = Math.round((item.reports / analytics.maxCategoryReports) * 100)}
 				<div class="cat-row">
 					<div class="cat-top">
@@ -107,7 +108,7 @@
 		</div>
 
 		<div class="trend-chart">
-			{#each analytics.data.trend as point}
+			{#each analytics.data.trend as point (point.label)}
 				{@const recPct = Math.round((point.received / analytics.maxTrendReceived) * 100)}
 				{@const verPct = Math.round((point.verified / analytics.maxTrendReceived) * 100)}
 				<div class="trend-col">
@@ -140,7 +141,7 @@
 			</tr>
 		</thead>
 		<tbody>
-			{#each analytics.data.barangays as row}
+			{#each analytics.data.barangays as row (row.barangay)}
 				<tr>
 					<td class="brgy-name">{row.barangay}</td>
 					<td class="col-num">{row.reports}</td>
@@ -179,6 +180,18 @@
 		margin: 4px 0 0;
 		font-size: 0.85rem;
 		color: #64748b;
+	}
+
+	.sample-note {
+		display: inline-block;
+		margin: 8px 0 0;
+		padding: 4px 10px;
+		border-radius: 6px;
+		background: #fffbeb;
+		border: 1px solid #fde68a;
+		color: #92400e;
+		font-size: 0.78rem;
+		font-weight: 600;
 	}
 
 	.controls {

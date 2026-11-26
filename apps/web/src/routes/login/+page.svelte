@@ -126,10 +126,24 @@
 	.login-page {
 		display: grid;
 		grid-template-columns: 420px minmax(0, 1fr);
-		width: 100vw;
-		height: 100vh;
+		width: 100%;
+		min-height: 100vh;
 		background: #f8fafc;
 		color: #0f172a;
+	}
+
+	@media (max-width: 768px) {
+		.login-page {
+			grid-template-columns: minmax(0, 1fr);
+		}
+
+		.brand-panel {
+			display: none;
+		}
+
+		.form-panel {
+			padding: 16px;
+		}
 	}
 
 	.brand-panel {

@@ -183,7 +183,7 @@ class QueueState {
 			: (this.items.find((item) => item.id === this.selectedIssueId) ?? null)
 	);
 
-	criticalCount = $derived(this.filteredItems.filter((i) => i.score >= 80).length);
+	criticalCount = $derived(this.filteredItems.filter((i) => i.score >= settings.current.criticalThreshold).length);
 
 	/** Reports behind the listed groups. */
 	reportTotal = $derived(this.filteredItems.reduce((sum, i) => sum + i.reports, 0));

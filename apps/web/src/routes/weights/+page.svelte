@@ -1,5 +1,13 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
+	import { settings } from '#lib/state/settings.svelte.ts';
 	import { weights } from '#lib/state/weights.svelte.ts';
+
+	// Show what's saved in Firestore, and refresh when it changes.
+	$effect(() => {
+		const current = settings.current;
+		untrack(() => weights.load(current));
+	});
 </script>
 
 <svelte:head>
@@ -21,16 +29,16 @@
 		<button
 			type="button"
 			class="btn-primary"
-			disabled={!weights.isBalanced}
+			disabled={!settings.loaded || !weights.isBalanced || weights.saving}
 			onclick={() => weights.saveChanges()}
 		>
-			Save weights
+			{weights.saving ? 'Saving…' : 'Save weights'}
 		</button>
 	</div>
 </div>
 
 {#if weights.savedNotice}
-	<div class="notice" role="status">
+	<div class="notice" class:error={weights.noticeIsError} role={weights.noticeIsError ? 'alert' : 'status'}>
 		<span>{weights.savedNotice}</span>
 		<button type="button" class="notice-close" onclick={() => (weights.savedNotice = null)}>
 			Dismiss
@@ -277,6 +285,16 @@
 		border-radius: 8px;
 		font-size: 0.82rem;
 		margin-bottom: 16px;
+	}
+
+	.notice.error {
+		background: #fef2f2;
+		border-color: #fecaca;
+		color: #b91c1c;
+	}
+
+	.notice.error .notice-close {
+		color: #b91c1c;
 	}
 
 	.notice-close {
