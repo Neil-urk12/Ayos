@@ -184,7 +184,7 @@ class DuplicateReviewState {
 			? this.suggestions[this.currentIndex % this.suggestions.length]
 			: undefined
 	);
-	displayNumber = $derived(Math.min(this.currentIndex + 1, this.totalCount));
+	displayNumber = $derived(this.totalCount === 0 ? 0 : (this.currentIndex % this.totalCount) + 1);
 
 	/** "Oldest waiting 6 h" for the queue KPI, or null when nothing is waiting. */
 	oldestWaitingLabel = $derived.by(() => {
@@ -199,7 +199,14 @@ class DuplicateReviewState {
 	nextPhoto() {
 		if (!this.current) return;
 		const totalPhotos = this.current.existingGroup.photos.length;
+		if (totalPhotos === 0) return;
 		this.activePhotoIndex = (this.activePhotoIndex + 1) % totalPhotos;
+	}
+
+	previous() {
+		if (this.totalCount <= 1) return;
+		this.activePhotoIndex = 0;
+		this.currentIndex = (this.currentIndex - 1 + this.totalCount) % this.totalCount;
 	}
 
 	async resolve(decision: DuplicateDecision) {
