@@ -100,8 +100,11 @@
 					Recurrence of a fixed issue
 				</button>
 			</div>
-			<div class="skip-row">
-				<button type="button" class="btn-skip" onclick={() => duplicates.resolve('skipped')}>
+			<div class="nav-row">
+				<button type="button" class="btn-link" onclick={() => duplicates.previous()}>
+					← Previous suggestion
+				</button>
+				<button type="button" class="btn-link" onclick={() => duplicates.resolve('skipped')}>
 					Skip for now
 				</button>
 			</div>
@@ -373,13 +376,14 @@
 		background: #f8fafc;
 	}
 
-	.skip-row {
+	.nav-row {
 		display: flex;
-		justify-content: flex-end;
+		align-items: center;
+		justify-content: space-between;
 		margin-top: 10px;
 	}
 
-	.btn-skip {
+	.btn-link {
 		background: transparent;
 		border: none;
 		color: #1d4ed8;
