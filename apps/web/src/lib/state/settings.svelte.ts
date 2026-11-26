@@ -20,7 +20,9 @@ export const DEFAULT_SETTINGS = {
 		threshold: 0.75,
 		/** How distance and time gap make up the combined score; should sum to 1. */
 		distanceWeight: 0.6,
-		timeWeight: 0.4
+		timeWeight: 0.4,
+		/** Weight of photo similarity when the on_report_created function has compared photos. */
+		imageWeight: 0.4
 	}
 };
 
@@ -48,7 +50,8 @@ function merge(data: Record<string, unknown> | undefined): Settings {
 			windowDays: num(d.windowDays, dd.windowDays),
 			threshold: num(d.threshold, dd.threshold),
 			distanceWeight: num(d.distanceWeight, dd.distanceWeight),
-			timeWeight: num(d.timeWeight, dd.timeWeight)
+			timeWeight: num(d.timeWeight, dd.timeWeight),
+			imageWeight: num(d.imageWeight, dd.imageWeight)
 		}
 	};
 }
