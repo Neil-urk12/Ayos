@@ -2,9 +2,10 @@
 	import IssueDetailView from '#lib/components/IssueDetailView.svelte';
 	import { duplicates } from '#lib/state/duplicates.svelte.ts';
 	import { queue } from '#lib/state/queue.svelte.ts';
+	import { settings } from '#lib/state/settings.svelte.ts';
 
 	function scoreColor(score: number): string {
-		if (score >= 80) return '#dc2626';
+		if (score >= settings.current.criticalThreshold) return '#dc2626';
 		if (score >= 60) return '#ea580c';
 		if (score >= 45) return '#d97706';
 		return '#475569';

@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { reports, type ReportStatus } from '#lib/state/report-list.svelte.ts';
+	import { reportList, type ReportStatus } from '#lib/state/report-list.svelte.ts';
 
 	function badgeClass(status: ReportStatus): string {
 		if (status === 'In progress') return 'pill progress';
 		if (status === 'Verified') return 'pill verified';
 		if (status === 'Duplicate') return 'pill duplicate';
+		if (status === 'Resolved') return 'pill resolved';
 		return 'pill received';
 	}
 </script>
@@ -24,34 +25,34 @@
 	<div class="controls">
 		<input
 			type="search"
-			bind:value={reports.searchQuery}
+			bind:value={reportList.searchQuery}
 			placeholder="Search code, street, summary..."
 			aria-label="Search reports"
 			class="search-input"
 		/>
 
-		<select bind:value={reports.selectedCategory} aria-label="Filter by category" class="select">
+		<select bind:value={reportList.selectedCategory} aria-label="Filter by category" class="select">
 			<option value="ALL">All categories</option>
-			{#each reports.categories as category}
+			{#each reportList.categories as category (category)}
 				<option value={category}>{category}</option>
 			{/each}
 		</select>
 
-		<select bind:value={reports.selectedBarangay} aria-label="Filter by barangay" class="select">
+		<select bind:value={reportList.selectedBarangay} aria-label="Filter by barangay" class="select">
 			<option value="ALL">All barangays</option>
-			{#each reports.barangays as barangay}
+			{#each reportList.barangays as barangay (barangay)}
 				<option value={barangay}>{barangay}</option>
 			{/each}
 		</select>
 
-		<select bind:value={reports.selectedStatus} aria-label="Filter by status" class="select">
+		<select bind:value={reportList.selectedStatus} aria-label="Filter by status" class="select">
 			<option value="ALL">All statuses</option>
-			{#each reports.statuses as status}
+			{#each reportList.statuses as status (status)}
 				<option value={status}>{status}</option>
 			{/each}
 		</select>
 
-		<button type="button" class="btn-export" onclick={() => reports.exportCsv()}>
+		<button type="button" class="btn-export" onclick={() => reportList.exportCsv()}>
 			Export CSV
 		</button>
 	</div>
@@ -60,29 +61,29 @@
 <section class="summary-strip" aria-label="Report counts">
 	<div class="stat-box">
 		<span class="stat-label">Matching reports</span>
-		<strong class="stat-val">{reports.filteredItems.length}</strong>
+		<strong class="stat-val">{reportList.filteredItems.length}</strong>
 	</div>
 	<div class="stat-box">
 		<span class="stat-label">Assigned to a group</span>
-		<strong class="stat-val">{reports.groupedCount}</strong>
+		<strong class="stat-val">{reportList.groupedCount}</strong>
 	</div>
 	<div class="stat-box">
 		<span class="stat-label">Resident safety flags</span>
-		<strong class="stat-val">{reports.flaggedCount}</strong>
+		<strong class="stat-val">{reportList.flaggedCount}</strong>
 	</div>
-	{#if reports.searchQuery || reports.selectedCategory !== 'ALL' || reports.selectedBarangay !== 'ALL' || reports.selectedStatus !== 'ALL'}
-		<button type="button" class="btn-reset" onclick={() => reports.clearFilters()}>
+	{#if reportList.searchQuery || reportList.selectedCategory !== 'ALL' || reportList.selectedBarangay !== 'ALL' || reportList.selectedStatus !== 'ALL'}
+		<button type="button" class="btn-reset" onclick={() => reportList.clearFilters()}>
 			Reset filters
 		</button>
 	{/if}
 </section>
 
-<div class="reports-layout" class:with-drawer={Boolean(reports.activeReport)}>
+<div class="reports-layout" class:with-drawer={Boolean(reportList.activeReport)}>
 	<section class="table-card" aria-label="Submitted reports list">
-		{#if reports.filteredItems.length === 0}
+		{#if reportList.filteredItems.length === 0}
 			<div class="empty-state">
 				<p>No reports match the current filters.</p>
-				<button type="button" class="btn-export" onclick={() => reports.clearFilters()}>
+				<button type="button" class="btn-export" onclick={() => reportList.clearFilters()}>
 					Clear filters
 				</button>
 			</div>
@@ -98,11 +99,11 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#each reports.filteredItems as rep (rep.id)}
+					{#each reportList.filteredItems as rep (rep.id)}
 						<tr
 							class="clickable-row"
-							class:selected={reports.activeReportId === rep.id}
-							onclick={() => reports.selectReport(rep.id)}
+							class:selected={reportList.activeReportId === rep.id}
+							onclick={() => reportList.selectReport(rep.id)}
 						>
 							<td class="col-code">
 								<div class="code-text">{rep.code}</div>
@@ -135,8 +136,8 @@
 		{/if}
 	</section>
 
-	{#if reports.activeReport}
-		{@const detail = reports.activeReport}
+	{#if reportList.activeReport}
+		{@const detail = reportList.activeReport}
 		<aside class="inspector-card" aria-label="Report details">
 			<div class="inspector-head">
 				<div>
@@ -146,7 +147,7 @@
 				<button
 					type="button"
 					class="btn-close"
-					onclick={() => (reports.activeReportId = null)}
+					onclick={() => (reportList.activeReportId = null)}
 					aria-label="Close report details"
 				>
 					✕
@@ -174,19 +175,17 @@
 				</div>
 			</dl>
 
-			<div class="field-group">
-				<label for="rep-status">Status</label>
-				<select id="rep-status" bind:value={detail.status} class="full-select">
-					{#each reports.statuses as st}
-						<option value={st}>{st}</option>
-					{/each}
-				</select>
-			</div>
-
-			<div class="field-group">
-				<label for="rep-notes">Reviewer notes</label>
-				<textarea id="rep-notes" bind:value={detail.notes} rows="3" class="notes-area"></textarea>
-			</div>
+			<!-- Read-only here: status and resident updates are changed on the issue in the priority queue. -->
+			<dl class="meta-list">
+				<div>
+					<dt>Status</dt>
+					<dd><span class={badgeClass(detail.status)}>{detail.status}</span></dd>
+				</div>
+				<div>
+					<dt>Update to residents</dt>
+					<dd>{detail.notes || '—'}</dd>
+				</div>
+			</dl>
 		</aside>
 	{/if}
 </div>
@@ -379,6 +378,12 @@
 		font-size: 0.85rem;
 		font-weight: 600;
 		color: #0f172a;
+		/* Descriptions run up to 2000 chars; the detail panel shows the full text. */
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
 	}
 
 	.location-text {
@@ -429,6 +434,11 @@
 	.pill.duplicate {
 		background: #ede9fe;
 		color: #6d28d9;
+	}
+
+	.pill.resolved {
+		background: #dcfce7;
+		color: #15803d;
 	}
 
 	.pill.received {
@@ -519,38 +529,5 @@
 		font-weight: 600;
 		color: #0f172a;
 		text-align: right;
-	}
-
-	.field-group {
-		margin-bottom: 12px;
-	}
-
-	.field-group label {
-		display: block;
-		font-size: 0.74rem;
-		font-weight: 600;
-		color: #334155;
-		margin-bottom: 5px;
-	}
-
-	.full-select,
-	.notes-area {
-		width: 100%;
-		border: 1px solid #cbd5e1;
-		border-radius: 6px;
-		font-family: inherit;
-		font-size: 0.78rem;
-		color: #0f172a;
-		background: #ffffff;
-	}
-
-	.full-select {
-		height: 34px;
-		padding: 0 10px;
-	}
-
-	.notes-area {
-		padding: 8px 10px;
-		resize: vertical;
 	}
 </style>
