@@ -80,7 +80,7 @@ service cloud.firestore {
     function validNewReport(data) {
       let fields = ['reporterId', 'title', 'category', 'street', 'area', 'reportCount', 'status',
         'reportedOn', 'receivedAt', 'danger', 'description', 'photoTone', 'map', 'accuracy',
-        'createdAt'];
+        'location', 'geohash', 'createdAt'];
       return data.keys().hasAll(fields) && data.keys().hasOnly(fields.concat(['similarHint']))
         && (!('similarHint' in data) || validSimilarHint(data.similarHint))
         && validText(data.title, 200) && data.title.size() > 0
@@ -94,6 +94,9 @@ service cloud.firestore {
         && validText(data.photoTone, 50)
         && data.map is map && data.map.x is number && data.map.y is number
         && data.accuracy is number
+        // FR-04: the device's GPS fix as a GeoPoint, plus its geohash for nearby queries.
+        && data.location is latlng
+        && data.geohash is string && data.geohash.size() >= 5 && data.geohash.size() <= 12
         && data.createdAt == request.time;
     }
 

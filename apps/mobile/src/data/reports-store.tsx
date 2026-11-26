@@ -1,5 +1,5 @@
 import { FirebaseError } from 'firebase/app';
-import type { DocumentData } from 'firebase/firestore';
+import { GeoPoint, type DocumentData } from 'firebase/firestore';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { Alert } from 'react-native';
 
@@ -18,6 +18,7 @@ import {
   type ReportSnapshot,
 } from '../lib/firebase/reports';
 import { savePhotos, saveThumbnail } from '../lib/firebase/photos';
+import { metresBetween, useDevicePosition, type LatLng } from '../lib/location';
 import { useAuth } from './auth-store';
 import {
   categoryLabels,
@@ -58,16 +59,32 @@ const ReportsContext = createContext<ReportsContextValue | null>(null);
  */
 const SIMILAR_RADIUS_METRES = 30;
 
-function toReport(id: string, data: DocumentData, mine: boolean): Report {
+type Here = { position: LatLng | null; map: { x: number; y: number } };
+
+/** Metres between two places: GPS when both have it, else positions on the map drawing. */
+function distanceBetween(
+  a: { location?: LatLng; map: { x: number; y: number } },
+  b: { location?: LatLng | null; map: { x: number; y: number } },
+) {
+  return a.location && b.location
+    ? metresBetween(a.location, b.location)
+    : mapDistance(a.map, b.map);
+}
+
+function toReport(id: string, data: DocumentData, mine: boolean, here: Here): Report {
   const createdAt: Date = data.createdAt?.toDate?.() ?? new Date();
   const map = data.map ?? draftLocation.map;
+  const location =
+    data.location instanceof GeoPoint
+      ? { latitude: data.location.latitude, longitude: data.location.longitude }
+      : undefined;
   return {
     id,
     title: data.title ?? '',
     category: data.category,
     street: data.street ?? '',
     area: data.area ?? '',
-    distance: mapDistance(map, draftLocation.map),
+    distance: distanceBetween({ location, map }, { location: here.position, map: here.map }),
     reportCount: data.reportCount ?? 1,
     status: data.status ?? 'received',
     statusNote: data.statusNote,
@@ -84,6 +101,7 @@ function toReport(id: string, data: DocumentData, mine: boolean): Report {
     photoTone: data.photoTone ?? colors.photo,
     thumbnail: typeof data.thumbnail === 'string' ? data.thumbnail : undefined,
     map,
+    location,
     mergedInto: data.mergedInto,
     confirmStillThere: Number(data.confirmStillThere ?? 0),
     confirmFixed: Number(data.confirmFixed ?? 0),
@@ -114,6 +132,8 @@ function showWriteError(title: string) {
 /** Reports from Firestore (reports/{id}), kept live with onSnapshot. */
 export function ReportsProvider({ children }: { children: ReactNode }) {
   const { user, signedIn, isGuest } = useAuth();
+  // Where the user is, for "nearby" on the map and list (FR-08).
+  const here = useDevicePosition();
   const uid = signedIn && user ? user.uid : null;
 
   // Tagged with the uid they were loaded for, so another account's data is never shown.
@@ -145,7 +165,7 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
   const reports = [...docs]
     .sort((a, b) => createdMs(b.data) - createdMs(a.data))
     .map(({ id, data }) =>
-      toReport(id, data, joinedIds.has(id) || (uid !== null && data.reporterId === uid)),
+      toReport(id, data, joinedIds.has(id) || (uid !== null && data.reporterId === uid), here),
     );
 
   const value: ReportsContextValue = {
@@ -157,7 +177,7 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
       reports
         // Merged reports are part of another report's group; match the group instead.
         .filter((r) => r.category === d.category && !r.mergedInto)
-        .map((report) => ({ report, distance: mapDistance(report.map, draftLocation.map) }))
+        .map((report) => ({ report, distance: distanceBetween(report, d) }))
         .filter(({ distance }) => distance <= SIMILAR_RADIUS_METRES)
         .sort((a, b) => {
           const aOpen = a.report.status !== 'resolved' ? 0 : 1;
@@ -181,8 +201,10 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
         danger: draft.danger,
         description: draft.description,
         photoTone: colors.photo,
-        map: draftLocation.map,
+        map: draft.map,
         accuracy: draft.accuracy,
+        location: new GeoPoint(draft.location.latitude, draft.location.longitude),
+        geohash: draft.geohash,
         ...(differentFrom ? { similarHint: { reportId: differentFrom, choice: 'different' } } : {}),
       })
         // shortcut: photos live only in memory, so closing the app between the report reaching

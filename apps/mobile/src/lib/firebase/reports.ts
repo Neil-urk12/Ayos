@@ -4,6 +4,7 @@ import {
   collectionGroup,
   deleteField,
   doc,
+  GeoPoint,
   getDocFromServer,
   increment,
   onSnapshot,
@@ -34,6 +35,9 @@ export type NewReportFields = {
   photoTone: string;
   map: { x: number; y: number };
   accuracy: number;
+  /** GPS position and its geohash, for nearby queries (FR-04). */
+  location: GeoPoint;
+  geohash: string;
   /** Set when the resident saw a similar report and said it's a different problem (FR-10). */
   similarHint?: { reportId: string; choice: 'different' };
 };

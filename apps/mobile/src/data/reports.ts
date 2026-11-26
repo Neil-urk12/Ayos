@@ -30,6 +30,8 @@ export type Report = {
   thumbnail?: string;
   /** Position on the neighbourhood map, as fractions of its width and height. */
   map: { x: number; y: number };
+  /** GPS position (reports.location GeoPoint); missing on reports from before GPS. */
+  location?: { latitude: number; longitude: number };
   /** How many residents said it's still there / fixed (FR-11), counted on the group's lead. */
   confirmStillThere: number;
   confirmFixed: number;
@@ -45,6 +47,10 @@ export type ReportDraft = {
   area: string;
   accuracy: number;
   photos: DraftPhoto[];
+  /** GPS fix from New report (FR-04). */
+  location: { latitude: number; longitude: number };
+  geohash: string;
+  map: { x: number; y: number };
 };
 
 /** A photo picked on the device, not uploaded yet. */

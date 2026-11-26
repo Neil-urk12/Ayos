@@ -3,8 +3,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -23,7 +25,6 @@ import { colors, fonts, radius, type } from '../constants/design';
 import {
   categoryLabels,
   categoryOrder,
-  draftLocation,
   formatTime,
   type Category,
   type DraftPhoto,
@@ -31,6 +32,7 @@ import {
 } from '../data/reports';
 import { useAuth } from '../data/auth-store';
 import { useReports } from '../data/reports-store';
+import { useCurrentPlace } from '../lib/location';
 
 const MAX_PHOTOS = 3;
 
@@ -76,7 +78,11 @@ export default function CreateReportScreen() {
   const [description, setDescription] = useState('');
   const [danger, setDanger] = useState(false);
 
-  const canSend = photos.length > 0 && category !== null;
+  // FR-04: the report's location is the device's GPS fix, read when the form opens.
+  const { state: placeState, retry: retryPlace } = useCurrentPlace(!isGuest);
+  const place = placeState.status === 'ready' ? placeState.place : null;
+
+  const canSend = photos.length > 0 && category !== null && place !== null;
 
   // firebase/firestore.rules refuses report writes from guests, so say so up front.
   if (isGuest) {
@@ -131,14 +137,17 @@ export default function CreateReportScreen() {
   };
 
   const send = () => {
-    if (!category) return;
+    if (!category || !place) return;
     const draft: ReportDraft = {
       category,
       description,
       danger,
-      street: draftLocation.street,
-      area: draftLocation.area,
-      accuracy: draftLocation.accuracy,
+      street: place.street,
+      area: place.area,
+      accuracy: place.accuracy,
+      location: { latitude: place.latitude, longitude: place.longitude },
+      geohash: place.geohash,
+      map: place.map,
       photos,
     };
     saveDraft(draft);
@@ -250,16 +259,59 @@ export default function CreateReportScreen() {
                   </View>
                 </View>
               </View>
-              <View style={styles.locationRow}>
-                <View style={styles.locationText}>
-                  <Text style={styles.locationName}>
-                    {draftLocation.street}, {draftLocation.area}
-                  </Text>
-                  <Text style={styles.locationMeta}>
-                    From GPS · accurate to about {draftLocation.accuracy} m
-                  </Text>
-                </View>
-                <Button label="Adjust pin" variant="secondary" size="md" style={styles.adjust} />
+              <View style={styles.locationRow} accessibilityLiveRegion="polite">
+                {placeState.status === 'loading' ? (
+                  <>
+                    <ActivityIndicator color={colors.primary} />
+                    <Text style={[styles.locationMeta, styles.locationText]}>
+                      Finding your location…
+                    </Text>
+                  </>
+                ) : placeState.status === 'ready' ? (
+                  <>
+                    <View style={styles.locationText}>
+                      <Text style={styles.locationName}>
+                        {placeState.place.street}, {placeState.place.area}
+                      </Text>
+                      <Text style={styles.locationMeta}>
+                        From GPS · accurate to about {placeState.place.accuracy} m
+                      </Text>
+                    </View>
+                    <Button
+                      label="Refresh"
+                      variant="secondary"
+                      size="md"
+                      onPress={retryPlace}
+                      style={styles.adjust}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <View style={styles.locationText}>
+                      <Text style={styles.locationName} accessibilityRole="alert">
+                        {placeState.status === 'denied'
+                          ? 'Location is off for Ayos'
+                          : 'Couldn’t get your location'}
+                      </Text>
+                      <Text style={styles.locationMeta}>
+                        {placeState.status === 'denied'
+                          ? 'Allow location so the LGU knows where the problem is.'
+                          : 'Turn on location services and try again.'}
+                      </Text>
+                    </View>
+                    <Button
+                      label={placeState.status === 'denied' ? 'Settings' : 'Try again'}
+                      variant="secondary"
+                      size="md"
+                      onPress={() =>
+                        placeState.status === 'denied'
+                          ? Linking.openSettings().catch(() => retryPlace())
+                          : retryPlace()
+                      }
+                      style={styles.adjust}
+                    />
+                  </>
+                )}
               </View>
             </View>
           </View>

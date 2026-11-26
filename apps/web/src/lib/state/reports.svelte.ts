@@ -37,6 +37,8 @@ export interface ReportDoc {
 	danger: boolean;
 	description: string;
 	map: { x: number; y: number };
+	/** GPS position from the mobile app (FR-04); missing on reports from before GPS. */
+	location?: { latitude: number; longitude: number };
 	accuracy?: number;
 	createdAt: Date;
 
@@ -74,6 +76,27 @@ export function mapDistance(a: { x: number; y: number }, b: { x: number; y: numb
 	return Math.hypot(a.x - b.x, a.y - b.y) * MAP_SPAN_METRES;
 }
 
+type LatLng = { latitude: number; longitude: number };
+
+/** Metres between two GPS points (haversine), same as the app and functions/scoring.py. */
+function gpsDistance(a: LatLng, b: LatLng) {
+	const rad = Math.PI / 180;
+	const h =
+		Math.sin(((b.latitude - a.latitude) * rad) / 2) ** 2 +
+		Math.cos(a.latitude * rad) *
+			Math.cos(b.latitude * rad) *
+			Math.sin(((b.longitude - a.longitude) * rad) / 2) ** 2;
+	return 2 * 6_371_000 * Math.asin(Math.sqrt(h));
+}
+
+/** Metres between two reports: GPS when both have it, else their positions on the map drawing. */
+export function reportDistance(
+	a: { map: { x: number; y: number }; location?: LatLng },
+	b: { map: { x: number; y: number }; location?: LatLng }
+) {
+	return a.location && b.location ? gpsDistance(a.location, b.location) : mapDistance(a.map, b.map);
+}
+
 export const DAY_MS = 24 * 60 * 60 * 1000;
 
 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -105,6 +128,13 @@ function toReportDoc(id: string, data: DocumentData): ReportDoc {
 		id,
 		reportCount: data.reportCount ?? 1,
 		map: data.map ?? { x: 0.5, y: 0.5 },
+		location:
+			typeof data.location?.latitude === 'number' && typeof data.location?.longitude === 'number'
+				? {
+						latitude: data.location.latitude,
+						longitude: data.location.longitude
+					}
+				: undefined,
 		createdAt: toDate(data.createdAt) ?? new Date(),
 		verifiedAtTs: toDate(data.verifiedAtTs)
 	};

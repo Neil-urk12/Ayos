@@ -44,6 +44,16 @@ class ScoringTest(unittest.TestCase):
     def test_map_distance_in_metres(self):
         self.assertAlmostEqual(scoring.map_distance({"x": 0, "y": 0}, {"x": 0.01, "y": 0}), 30)
 
+    def test_gps_distance_is_used_when_both_reports_have_it(self):
+        # 0.0002 degrees of latitude is about 22 m, wherever the map positions say they are.
+        a = report(location={"latitude": 10.3330, "longitude": 123.896}, map={"x": 0, "y": 0})
+        b = report(location={"latitude": 10.3332, "longitude": 123.896}, map={"x": 1, "y": 1})
+        self.assertAlmostEqual(scoring.report_distance(a, b), 22.24, places=1)
+        # One without GPS (an old report): fall back to the map drawing.
+        self.assertAlmostEqual(
+            scoring.report_distance(a, report(map={"x": 0.01, "y": 0})), 30, places=5
+        )
+
     def test_match_score_without_photos_matches_dashboard(self):
         # Dashboard: 0.6 * (1 - 6/30) + 0.4 * (1 - 3/30)
         self.assertAlmostEqual(scoring.match_score(6, 3, None, D), 0.6 * 0.8 + 0.4 * 0.9)
