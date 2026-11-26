@@ -28,6 +28,13 @@
     "plugins": [
       "expo-router",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Ayos uses your photos so you can attach a picture of the problem to your report.",
+          "cameraPermission": "Ayos uses the camera so you can take a picture of the problem for your report."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#208AEF",
