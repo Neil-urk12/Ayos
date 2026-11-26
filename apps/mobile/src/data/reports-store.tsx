@@ -6,6 +6,7 @@ import { Alert } from 'react-native';
 import { colors } from '../constants/design';
 import {
   answerFix,
+  confirmIssue,
   createReport,
   joinReport,
   mergedIntoOnServer,
@@ -13,6 +14,7 @@ import {
   reportErrorMessage,
   watchJoinedReportIds,
   watchReports,
+  type Confirmation,
   type ReportSnapshot,
 } from '../lib/firebase/reports';
 import { savePhotos, saveThumbnail } from '../lib/firebase/photos';
@@ -36,17 +38,25 @@ type ReportsContextValue = {
   getReport: (id: string) => Report | undefined;
   saveDraft: (draft: ReportDraft) => void;
   findSimilar: (draft: ReportDraft) => SimilarReport[];
-  /** Files a draft as a new report and returns its id. */
-  submitNew: (draft: ReportDraft) => string;
+  /**
+   * Files a draft as a new report and returns its id. `differentFrom` is the similar report the
+   * user saw on the duplicate check and said is a different problem (FR-10).
+   */
+  submitNew: (draft: ReportDraft, differentFrom?: string) => string;
   /** Adds the draft to an existing report and returns that report's id. */
   joinExisting: (id: string) => string;
   confirmFix: (id: string, fixed: boolean) => void;
+  /** Records the user's one "still there" / "fixed" answer for an issue group (FR-11). */
+  confirmIssue: (groupId: string, value: Confirmation) => void;
 };
 
 const ReportsContext = createContext<ReportsContextValue | null>(null);
 
-/** Reports this close to the draft pin, in the same category, count as "already reported?". */
-const SIMILAR_RADIUS_METRES = 50;
+/**
+ * Reports this close to the draft pin, in the same category, count as "already reported?"
+ * (FR-10). Same radius as the server-side duplicate check (settings/priority radiusMeters).
+ */
+const SIMILAR_RADIUS_METRES = 30;
 
 function toReport(id: string, data: DocumentData, mine: boolean): Report {
   const createdAt: Date = data.createdAt?.toDate?.() ?? new Date();
@@ -75,6 +85,8 @@ function toReport(id: string, data: DocumentData, mine: boolean): Report {
     thumbnail: typeof data.thumbnail === 'string' ? data.thumbnail : undefined,
     map,
     mergedInto: data.mergedInto,
+    confirmStillThere: Number(data.confirmStillThere ?? 0),
+    confirmFixed: Number(data.confirmFixed ?? 0),
   };
 }
 
@@ -152,7 +164,7 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
           const bOpen = b.report.status !== 'resolved' ? 0 : 1;
           return aOpen - bOpen || a.distance - b.distance;
         }),
-    submitNew: (draft) => {
+    submitNew: (draft, differentFrom) => {
       const id = newReportId();
       if (!uid) return id;
       const now = new Date();
@@ -171,6 +183,7 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
         photoTone: colors.photo,
         map: draftLocation.map,
         accuracy: draft.accuracy,
+        ...(differentFrom ? { similarHint: { reportId: differentFrom, choice: 'different' } } : {}),
       })
         // shortcut: photos live only in memory, so closing the app between the report reaching
         // the server and the upload finishing drops them silently; persist drafts if that bites.
@@ -230,6 +243,17 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
     },
     confirmFix: (id, fixed) => {
       answerFix(id, fixed).catch(showWriteError('Couldn’t save your answer'));
+    },
+    confirmIssue: (groupId, value) => {
+      if (!uid || isGuest) return;
+      confirmIssue(groupId, uid, value).catch((error) => {
+        // The rules allow one answer per person; the screen hides the buttons once it loads.
+        if (error instanceof FirebaseError && error.code === 'permission-denied') {
+          Alert.alert('Already answered', 'You’ve already told the LGU about this issue.');
+          return;
+        }
+        showWriteError('Couldn’t save your answer')(error);
+      });
     },
   };
 

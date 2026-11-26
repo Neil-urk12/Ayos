@@ -44,6 +44,23 @@ service cloud.firestore {
       return signedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
 
+    function confirmationPath(reportId) {
+      return /databases/$(database)/documents/reports/$(reportId)/confirmations/$(request.auth.uid);
+    }
+
+    // The report counter each "Is it still there?" answer adds to (FR-11).
+    function confirmationCountField(value) {
+      return value == 'still_there' ? 'confirmStillThere' : 'confirmFixed';
+    }
+
+    // FR-10: the similar report the resident saw and said is a different problem.
+    function validSimilarHint(hint) {
+      return hint is map
+        && hint.keys().hasAll(['reportId', 'choice']) && hint.keys().hasOnly(['reportId', 'choice'])
+        && hint.choice == 'different'
+        && hint.reportId is string && hint.reportId.size() > 0 && hint.reportId.size() <= 20;
+    }
+
     function validName(value) {
       return value is string && value.size() > 0 && value.size() <= 100;
     }
@@ -64,7 +81,8 @@ service cloud.firestore {
       let fields = ['reporterId', 'title', 'category', 'street', 'area', 'reportCount', 'status',
         'reportedOn', 'receivedAt', 'danger', 'description', 'photoTone', 'map', 'accuracy',
         'createdAt'];
-      return data.keys().hasAll(fields) && data.keys().hasOnly(fields)
+      return data.keys().hasAll(fields) && data.keys().hasOnly(fields.concat(['similarHint']))
+        && (!('similarHint' in data) || validSimilarHint(data.similarHint))
         && validText(data.title, 200) && data.title.size() > 0
         && data.category in ['road', 'drainage', 'streetlight', 'sidewalk']
         && validName(data.street)
@@ -97,11 +115,16 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time;
 
       // Users may change their name and LGU; uid, email, role and createdAt are locked.
-      allow update: if isOwner(uid)
+      allow update: if (isOwner(uid)
         && changedOnly(['fullName', 'lgu', 'updatedAt'])
         && validName(request.resource.data.fullName)
         && validName(request.resource.data.lgu)
-        && request.resource.data.updatedAt == request.time;
+        && request.resource.data.updatedAt == request.time)
+        // This phone's FCM token for status notifications (src/lib/notifications.ts). Removed on
+        // sign-out; the notify_reporters Cloud Function removes tokens FCM rejects.
+        || (isOwner(uid) && changedOnly(['fcmTokens'])
+          && request.resource.data.fcmTokens is list
+          && request.resource.data.fcmTokens.size() <= 10);
 
       allow delete: if false;
     }
@@ -141,6 +164,18 @@ service cloud.firestore {
           && request.resource.data.reportCount == resource.data.reportCount + 1
           && !exists(supporterPath(reportId))
           && existsAfter(supporterPath(reportId)))
+        // "Is it still there?" (FR-11): +1 on one counter in the same batch that creates the
+        // resident's confirmations/{uid} doc with the matching answer, so each person counts
+        // once per issue group. Only on a group's lead, not a report merged into it.
+        || (isResident()
+          && !('mergedInto' in resource.data)
+          && !exists(confirmationPath(reportId))
+          && existsAfter(confirmationPath(reportId))
+          && changedOnly([confirmationCountField(getAfter(confirmationPath(reportId)).data.value)])
+          && request.resource.data.get(
+              confirmationCountField(getAfter(confirmationPath(reportId)).data.value), 0)
+            == resource.data.get(
+              confirmationCountField(getAfter(confirmationPath(reportId)).data.value), 0) + 1)
         // Confirming a fix: the reporter or a supporter answers a resolved report.
         || ((isOwner(resource.data.reporterId) || exists(supporterPath(reportId)))
           && resource.data.status == 'resolved'
@@ -176,14 +211,35 @@ service cloud.firestore {
           || (signedIn() && resource.data.uid == request.auth.uid);
       }
 
+      // reports/{reportId}/confirmations/{uid}: one "still there" / "fixed" answer per resident
+      // per issue group (FR-11), created with the counter bump above. Answers can't be changed.
+      match /confirmations/{uid} {
+        allow read: if signedIn();
+        allow create: if isOwner(uid) && isResident()
+          && request.resource.data.keys().hasAll(['uid', 'value', 'createdAt'])
+          && request.resource.data.keys().hasOnly(['uid', 'value', 'createdAt'])
+          && request.resource.data.uid == uid
+          && request.resource.data.value in ['still_there', 'fixed']
+          && request.resource.data.createdAt == request.time
+          && exists(reportPath(reportId))
+          && !('mergedInto' in get(reportPath(reportId)).data)
+          && getAfter(reportPath(reportId)).data.get(
+              confirmationCountField(request.resource.data.value), 0)
+            == get(reportPath(reportId)).data.get(
+              confirmationCountField(request.resource.data.value), 0) + 1;
+      }
+
       // reports/{reportId}/supporters/{uid}: one doc per resident who joined the report.
       match /supporters/{uid} {
         allow read: if signedIn();
         // Only alongside the write that earns it: creating the report as its reporter, or
         // joining (reportCount + 1 in the same batch). A bare supporter doc would grant
         // confirm-fix rights without joining.
+        // similarHint 'same': they joined from the duplicate check's "looks the same" (FR-10).
         allow create: if isOwner(uid) && isResident()
-          && request.resource.data.keys().hasOnly(['uid', 'joinedAt'])
+          && request.resource.data.keys().hasOnly(['uid', 'joinedAt', 'similarHint'])
+          && (!('similarHint' in request.resource.data)
+            || request.resource.data.similarHint == 'same')
           && request.resource.data.uid == uid
           && request.resource.data.joinedAt == request.time
           && ((!exists(reportPath(reportId)) && getAfter(reportPath(reportId)).data.reporterId == uid)

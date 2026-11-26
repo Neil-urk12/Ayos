@@ -14,6 +14,7 @@ import { useEffect } from 'react';
 import { colors } from '../constants/design';
 import { AuthProvider, useAuth } from '../data/auth-store';
 import { ReportsProvider } from '../data/reports-store';
+import { useOpenReportFromNotification } from '../lib/notifications';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -27,6 +28,8 @@ export default function RootLayout() {
 
 function RootNavigator() {
   const { signedIn, initializing } = useAuth();
+  // Tapping a status notification opens that report, once the signed-in screens exist.
+  useOpenReportFromNotification(signedIn && !initializing);
   const [loaded, error] = useFonts({
     Inter_400Regular,
     Inter_500Medium,

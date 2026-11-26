@@ -2,6 +2,7 @@
 // Run from the repo root with `pnpm test:rules`, which starts the Firestore and Storage
 // emulators, runs this file, and shuts them down again.
 
+import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { after, before, beforeEach, describe, it } from 'node:test';
 
@@ -11,6 +12,7 @@ import {
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import {
+  arrayRemove,
   arrayUnion,
   collection,
   deleteDoc,
@@ -101,7 +103,24 @@ function fileReport(db, id, uid) {
 function joinReport(db, id, uid) {
   const batch = writeBatch(db);
   batch.update(doc(db, 'reports', id), { reportCount: increment(1) });
-  batch.set(doc(db, 'reports', id, 'supporters', uid), { uid, joinedAt: serverTimestamp() });
+  batch.set(doc(db, 'reports', id, 'supporters', uid), {
+    uid,
+    joinedAt: serverTimestamp(),
+    similarHint: 'same',
+  });
+  return batch.commit();
+}
+
+/** Records uid's "still there" / "fixed" answer, like confirmIssue(). */
+function confirmIssue(db, id, uid, value, field) {
+  const counter = field ?? (value === 'fixed' ? 'confirmFixed' : 'confirmStillThere');
+  const batch = writeBatch(db);
+  batch.set(doc(db, 'reports', id, 'confirmations', uid), {
+    uid,
+    value,
+    createdAt: serverTimestamp(),
+  });
+  batch.update(doc(db, 'reports', id), { [counter]: increment(1) });
   return batch.commit();
 }
 
@@ -557,5 +576,128 @@ describe('report photos', () => {
     await assertSucceeds(
       getDocs(collection(guest().firestore(), 'reports', ALICE_REPORT, 'photos')),
     );
+  });
+});
+
+describe('push notification tokens', () => {
+  it('a user can add and remove their own phone token', async () => {
+    const user = doc(resident('alice').firestore(), 'users', 'alice');
+    await assertSucceeds(updateDoc(user, { fcmTokens: arrayUnion('token-1') }));
+    await assertSucceeds(updateDoc(user, { fcmTokens: arrayRemove('token-1') }));
+  });
+
+  it("a user cannot add tokens to someone else's profile", async () => {
+    await assertFails(
+      updateDoc(doc(resident('bob').firestore(), 'users', 'alice'), {
+        fcmTokens: arrayUnion('bob-phone'),
+      }),
+    );
+  });
+
+  it('tokens cannot be smuggled in with other fields', async () => {
+    await assertFails(
+      updateDoc(doc(resident('alice').firestore(), 'users', 'alice'), {
+        fcmTokens: arrayUnion('token-1'),
+        role: 'staff',
+      }),
+    );
+  });
+});
+
+describe('similar-report hint (FR-10)', () => {
+  function fileWithHint(db, id, hint) {
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'reports', id), { ...newReportFields('bob'), similarHint: hint });
+    batch.set(doc(db, 'reports', id, 'supporters', 'bob'), {
+      uid: 'bob',
+      joinedAt: serverTimestamp(),
+    });
+    return batch.commit();
+  }
+
+  it('a new report can say which similar report it is different from', async () => {
+    await assertSucceeds(
+      fileWithHint(resident('bob').firestore(), 'AY-BOBDIF', {
+        reportId: ALICE_REPORT,
+        choice: 'different',
+      }),
+    );
+  });
+
+  it('the hint must be well formed', async () => {
+    const db = resident('bob').firestore();
+    await assertFails(
+      fileWithHint(db, 'AY-BOBBAD', { reportId: ALICE_REPORT, choice: 'merge-me' }),
+    );
+    await assertFails(fileWithHint(db, 'AY-BOBBA2', 'different'));
+  });
+
+  it("joining records 'looks the same' on the supporter doc, nothing else", async () => {
+    const db = resident('bob').firestore();
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'reports', ALICE_REPORT), { reportCount: increment(1) });
+    batch.set(doc(db, 'reports', ALICE_REPORT, 'supporters', 'bob'), {
+      uid: 'bob',
+      joinedAt: serverTimestamp(),
+      similarHint: 'different',
+    });
+    await assertFails(batch.commit());
+  });
+});
+
+describe('still there / fixed confirmations (FR-11)', () => {
+  it('a resident can answer once, and the count goes up by one', async () => {
+    const db = resident('bob').firestore();
+    await assertSucceeds(confirmIssue(db, GROUP_REPORT, 'bob', 'still_there'));
+    let count;
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      count = (await getDoc(doc(ctx.firestore(), 'reports', GROUP_REPORT))).data()
+        .confirmStillThere;
+    });
+    assert.equal(count, 1);
+    await assertFails(confirmIssue(db, GROUP_REPORT, 'bob', 'fixed'));
+    await assertFails(confirmIssue(db, GROUP_REPORT, 'bob', 'still_there'));
+  });
+
+  it('the counter must match the answer', async () => {
+    await assertFails(
+      confirmIssue(resident('bob').firestore(), GROUP_REPORT, 'bob', 'fixed', 'confirmStillThere'),
+    );
+  });
+
+  it('the count cannot be bumped without an answer, or by more than one', async () => {
+    const db = resident('bob').firestore();
+    await assertFails(updateDoc(doc(db, 'reports', GROUP_REPORT), { confirmFixed: increment(1) }));
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'reports', GROUP_REPORT, 'confirmations', 'bob'), {
+      uid: 'bob',
+      value: 'fixed',
+      createdAt: serverTimestamp(),
+    });
+    batch.update(doc(db, 'reports', GROUP_REPORT), { confirmFixed: increment(5) });
+    await assertFails(batch.commit());
+  });
+
+  it('a resident cannot answer for someone else', async () => {
+    await assertFails(confirmIssue(resident('bob').firestore(), GROUP_REPORT, 'carol', 'fixed'));
+  });
+
+  it('guests cannot answer', async () => {
+    await assertFails(confirmIssue(guest().firestore(), GROUP_REPORT, 'guest', 'fixed'));
+  });
+
+  it('answers go on the group, not a report merged into it', async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      updateDoc(doc(ctx.firestore(), 'reports', ALICE_REPORT), { mergedInto: GROUP_REPORT }),
+    );
+    await assertFails(confirmIssue(resident('bob').firestore(), ALICE_REPORT, 'bob', 'fixed'));
+  });
+
+  it('answers cannot be changed or deleted', async () => {
+    const db = resident('bob').firestore();
+    await assertSucceeds(confirmIssue(db, GROUP_REPORT, 'bob', 'fixed'));
+    const answer = doc(db, 'reports', GROUP_REPORT, 'confirmations', 'bob');
+    await assertFails(updateDoc(answer, { value: 'still_there' }));
+    await assertFails(deleteDoc(answer));
   });
 });
