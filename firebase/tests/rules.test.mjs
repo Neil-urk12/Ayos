@@ -193,12 +193,6 @@ describe('guests', () => {
     await assertFails(fileReport(guest().firestore(), 'AY-GUEST1', 'guest'));
   });
 
-  it('cannot create a report without the supporters doc either', async () => {
-    await assertFails(
-      setDoc(doc(guest().firestore(), 'reports', 'AY-GUEST2'), newReportFields('guest')),
-    );
-  });
-
   it('cannot join an existing report', async () => {
     await assertFails(joinReport(guest().firestore(), ALICE_REPORT, 'guest'));
   });
@@ -240,6 +234,12 @@ describe('signed-up residents', () => {
 
   it('can create a report', async () => {
     await assertSucceeds(fileReport(resident('bob').firestore(), 'AY-BOB001', 'bob'));
+  });
+
+  it('cannot create a report without its supporters doc', async () => {
+    await assertFails(
+      setDoc(doc(resident('bob').firestore(), 'reports', 'AY-BOB002'), newReportFields('bob')),
+    );
   });
 
   it('cannot create a report in someone else’s name', async () => {
