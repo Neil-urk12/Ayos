@@ -18,6 +18,7 @@ import {
   deleteDoc,
   deleteField,
   doc,
+  GeoPoint,
   getDoc,
   getDocs,
   increment,
@@ -57,6 +58,8 @@ function baseReport(reporterId, overrides = {}) {
     photoTone: 'warm',
     map: { x: 0.4, y: 0.6 },
     accuracy: 12,
+    location: new GeoPoint(10.3325, 123.8955),
+    geohash: 'wdqbx2w7k',
     createdAt: new Date('2026-11-20T09:00:00Z'),
     ...overrides,
   };
@@ -699,5 +702,44 @@ describe('still there / fixed confirmations (FR-11)', () => {
     const answer = doc(db, 'reports', GROUP_REPORT, 'confirmations', 'bob');
     await assertFails(updateDoc(answer, { value: 'still_there' }));
     await assertFails(deleteDoc(answer));
+  });
+});
+
+describe('report location (FR-04)', () => {
+  function fileWith(db, id, fields) {
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'reports', id), { ...newReportFields('bob'), ...fields });
+    batch.set(doc(db, 'reports', id, 'supporters', 'bob'), {
+      uid: 'bob',
+      joinedAt: serverTimestamp(),
+    });
+    return batch.commit();
+  }
+
+  it('a new report must have a GPS point and geohash', async () => {
+    const db = resident('bob').firestore();
+    const { location: _l, geohash: _g, ...withoutGps } = newReportFields('bob');
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'reports', 'AY-NOGPS1'), withoutGps);
+    batch.set(doc(db, 'reports', 'AY-NOGPS1', 'supporters', 'bob'), {
+      uid: 'bob',
+      joinedAt: serverTimestamp(),
+    });
+    await assertFails(batch.commit());
+  });
+
+  it('the location must be a GeoPoint and the geohash a short string', async () => {
+    const db = resident('bob').firestore();
+    await assertFails(fileWith(db, 'AY-BADGP1', { location: { lat: 10.3, lng: 123.9 } }));
+    await assertFails(fileWith(db, 'AY-BADGP2', { geohash: 'wd' }));
+    await assertSucceeds(fileWith(db, 'AY-GOODGP', {}));
+  });
+
+  it('the reporter cannot move the report afterwards', async () => {
+    await assertFails(
+      updateDoc(doc(resident('alice').firestore(), 'reports', ALICE_REPORT), {
+        location: new GeoPoint(14.5995, 120.9842),
+      }),
+    );
   });
 });

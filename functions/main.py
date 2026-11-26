@@ -124,7 +124,7 @@ def on_report_created(event: firestore_fn.Event[firestore_fn.DocumentSnapshot | 
         for gid, group in candidates
         if gid != report_id
         and not group.get("mergedInto")
-        and scoring.map_distance(report.get("map"), group.get("map")) <= settings.radius_meters
+        and scoring.report_distance(report, group) <= settings.radius_meters
     ]
     group_vectors = _group_embeddings(nearby_ids) if vector and nearby_ids else {}
 

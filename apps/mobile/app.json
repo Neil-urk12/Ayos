@@ -49,6 +49,12 @@
           "defaultChannel": "status-updates",
           "color": "#208AEF"
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Ayos uses your location so the LGU knows where the reported problem is, and to show reports near you."
+        }
       ]
     ],
     "experiments": {

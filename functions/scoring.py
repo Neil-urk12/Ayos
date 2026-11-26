@@ -85,6 +85,39 @@ def map_distance(a: Mapping[str, Any] | None, b: Mapping[str, Any] | None) -> fl
     return math.hypot(float(a["x"]) - float(b["x"]), float(a["y"]) - float(b["y"])) * MAP_SPAN_METRES
 
 
+EARTH_RADIUS_METRES = 6_371_000
+
+
+def _lat_lng(value: Any) -> tuple[float, float] | None:
+    """(lat, lng) from a Firestore GeoPoint or a {latitude, longitude} mapping."""
+    if value is None:
+        return None
+    if isinstance(value, Mapping):
+        lat, lng = value.get("latitude"), value.get("longitude")
+    else:
+        lat, lng = getattr(value, "latitude", None), getattr(value, "longitude", None)
+    if lat is None or lng is None:
+        return None
+    return float(lat), float(lng)
+
+
+def gps_distance(a: tuple[float, float], b: tuple[float, float]) -> float:
+    """Metres between two (lat, lng) points (haversine), same as geofire-common in the app."""
+    lat1, lng1, lat2, lng2 = map(math.radians, (*a, *b))
+    h = math.sin((lat2 - lat1) / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(
+        (lng2 - lng1) / 2
+    ) ** 2
+    return 2 * EARTH_RADIUS_METRES * math.asin(math.sqrt(h))
+
+
+def report_distance(a: Mapping[str, Any], b: Mapping[str, Any]) -> float:
+    """Metres between two reports: GPS (FR-04) when both have it, else their map positions."""
+    pa, pb = _lat_lng(a.get("location")), _lat_lng(b.get("location"))
+    if pa and pb:
+        return gps_distance(pa, pb)
+    return map_distance(a.get("map"), b.get("map"))
+
+
 def gap_days(newer: datetime, older: datetime) -> int:
     return math.floor((newer - older).total_seconds() / DAY_SECONDS)
 
@@ -136,7 +169,7 @@ def best_match(
         group_created: datetime | None = group.get("createdAt")
         if group_created is None or group_created > created:
             continue
-        distance = map_distance(report.get("map"), group.get("map"))
+        distance = report_distance(report, group)
         days = gap_days(created, group_created)
         if distance > d.radius_meters or days > d.window_days:
             continue

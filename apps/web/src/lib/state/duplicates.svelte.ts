@@ -15,7 +15,7 @@ import { staff } from './auth.svelte.ts';
 import {
 	categoryLabels,
 	DAY_MS,
-	mapDistance,
+	reportDistance,
 	reportRef,
 	reports,
 	statusLabels,
@@ -100,7 +100,8 @@ export function startImageScores() {
 function matchScore(distance: number, gapDays: number, imageSimilarity: number | null) {
 	const d = settings.current.duplicates;
 	const closeness =
-		d.distanceWeight * (1 - distance / d.radiusMeters) + d.timeWeight * (1 - gapDays / d.windowDays);
+		d.distanceWeight * (1 - distance / d.radiusMeters) +
+		d.timeWeight * (1 - gapDays / d.windowDays);
 	const total = d.imageWeight + d.distanceWeight + d.timeWeight;
 	if (imageSimilarity === null || total <= 0) return closeness;
 	return (d.imageWeight * imageSimilarity + closeness) / total;
@@ -187,7 +188,7 @@ function findSuggestions(docs: ReportDoc[], skipped: ReadonlySet<string>): Dupli
 			if (report.notDuplicateOf?.includes(group.id)) continue;
 			if (skipped.has(`${report.id}->${group.id}`)) continue;
 
-			const distance = mapDistance(report.map, group.map);
+			const distance = reportDistance(report, group);
 			const gapDays = Math.floor((report.createdAt.getTime() - group.createdAt.getTime()) / DAY_MS);
 			if (distance > radiusMeters || gapDays > windowDays) continue;
 
@@ -331,12 +332,19 @@ class DuplicateReviewState {
 					tx.update(reportRef(reportId), patch);
 					for (const child of children) {
 						// They follow the new group's status too, like the report itself.
-						tx.update(reportRef(child.id), { mergedInto: groupId, status: lead.status });
+						tx.update(reportRef(child.id), {
+							mergedInto: groupId,
+							status: lead.status
+						});
 					}
 					// reportCount on the group counts everyone in it; unmerge takes it back off.
-					tx.update(reportRef(groupId), { reportCount: increment(reportCount) });
+					tx.update(reportRef(groupId), {
+						reportCount: increment(reportCount)
+					});
 				} else if (decision === 'rejected') {
-					tx.update(reportRef(reportId), { notDuplicateOf: arrayUnion(groupId) });
+					tx.update(reportRef(reportId), {
+						notDuplicateOf: arrayUnion(groupId)
+					});
 				} else {
 					tx.update(reportRef(reportId), { recurrenceOf: groupId });
 				}
