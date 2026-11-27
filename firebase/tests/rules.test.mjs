@@ -437,7 +437,9 @@ describe('storage', () => {
 });
 
 describe('report photos', () => {
-  const dataUri = 'data:image/jpeg;base64,' + 'A'.repeat(1000);
+  const prefix = 'data:image/jpeg;base64,';
+  const dataUri = prefix + 'A'.repeat(1000);
+  const remoteUrl = 'https://tracker.example/x.jpg';
   const photo = (uid) => ({ uid, data: dataUri, createdAt: serverTimestamp() });
   const photoRef = (db, reportId, id) => doc(db, 'reports', reportId, 'photos', id);
 
@@ -467,7 +469,23 @@ describe('report photos', () => {
   it('a thumbnail cannot be huge', async () => {
     await assertFails(
       updateDoc(doc(resident('alice').firestore(), 'reports', ALICE_REPORT), {
-        thumbnail: 'A'.repeat(60001),
+        thumbnail: prefix + 'A'.repeat(60001 - prefix.length),
+      }),
+    );
+  });
+
+  it('a thumbnail exactly at the limit is accepted', async () => {
+    await assertSucceeds(
+      updateDoc(doc(resident('alice').firestore(), 'reports', ALICE_REPORT), {
+        thumbnail: prefix + 'A'.repeat(60000 - prefix.length),
+      }),
+    );
+  });
+
+  it('a thumbnail must be a JPEG data URI, not a URL', async () => {
+    await assertFails(
+      updateDoc(doc(resident('alice').firestore(), 'reports', ALICE_REPORT), {
+        thumbnail: remoteUrl,
       }),
     );
   });
@@ -483,7 +501,25 @@ describe('report photos', () => {
     await assertFails(
       setDoc(photoRef(resident('alice').firestore(), ALICE_REPORT, 'alice_0'), {
         ...photo('alice'),
-        data: 'A'.repeat(900001),
+        data: prefix + 'A'.repeat(900001 - prefix.length),
+      }),
+    );
+  });
+
+  it('a photo exactly at the limit is accepted', async () => {
+    await assertSucceeds(
+      setDoc(photoRef(resident('alice').firestore(), ALICE_REPORT, 'alice_0'), {
+        ...photo('alice'),
+        data: prefix + 'A'.repeat(900000 - prefix.length),
+      }),
+    );
+  });
+
+  it('a photo must be a JPEG data URI, not a URL', async () => {
+    await assertFails(
+      setDoc(photoRef(resident('alice').firestore(), ALICE_REPORT, 'alice_0'), {
+        ...photo('alice'),
+        data: remoteUrl,
       }),
     );
   });
