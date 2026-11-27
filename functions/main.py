@@ -18,7 +18,7 @@ Deploying needs the Blaze plan. Test locally with the emulators (see functions/R
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from firebase_admin import firestore, initialize_app
@@ -113,10 +113,14 @@ def on_report_created(event: firestore_fn.Event[firestore_fn.DocumentSnapshot | 
         log.exception("Could not embed the photo for %s", report_id)
 
     settings = _settings().duplicates
+    # Only reports inside the time window can match, so don't read older ones. The extra day
+    # covers gap_days rounding down; best_match applies the exact window.
+    oldest = report["createdAt"] - timedelta(days=settings.window_days + 1)
     candidates = [
         (snap.id, snap.to_dict())
         for snap in db.collection(REPORTS)
         .where(filter=FieldFilter("category", "==", report.get("category")))
+        .where(filter=FieldFilter("createdAt", ">=", oldest))
         .stream()
     ]
     nearby_ids = [
