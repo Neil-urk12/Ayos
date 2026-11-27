@@ -172,6 +172,8 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
         map: draftLocation.map,
         accuracy: draft.accuracy,
       })
+        // shortcut: photos live only in memory, so closing the app between the report reaching
+        // the server and the upload finishing drops them silently; persist drafts if that bites.
         .then(async () => {
           const [first] = draft.photos;
           if (!first) return;
@@ -200,12 +202,25 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
               // Guests can't reach this screen, so a denial means either the user is already a
               // supporter (the joined-ids snapshot hadn't loaded yet) or staff merged the report
               // meanwhile. Only the second loses the join, so only that one is worth telling.
-              const group = await mergedIntoOnServer(id).catch(() => undefined);
+              // null = couldn't tell; don't guess, since saving photos on a merged report fails.
+              const group = await mergedIntoOnServer(id).catch(() => null);
+              if (group === null) return;
               if (group) {
                 Alert.alert(
                   'Couldn’t add your report',
                   `This report was just combined with ${group}. Open ${group} and add yours there.`,
                 );
+                return;
+              }
+              // Already a supporter: the new photos still belong on the report.
+              try {
+                await savePhotos(id, uid, photos);
+              } catch (photoError) {
+                const denied =
+                  photoError instanceof FirebaseError && photoError.code === 'permission-denied';
+                if (!denied) throw photoError;
+                // Photos can't be replaced, so they already added some on an earlier join.
+                Alert.alert(PHOTO_UPLOAD_ERROR, 'You’ve already added photos to this report.');
               }
             },
           )

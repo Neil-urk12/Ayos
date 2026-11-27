@@ -21,11 +21,22 @@ const THUMBNAIL_SIDE = 240;
 
 export type LocalPhoto = { uri: string; width?: number; height?: number };
 
+/** The picker's size, or the decoded size when it reported 0 (so small photos aren't enlarged). */
+async function sizeOf(photo: LocalPhoto): Promise<{ width: number; height: number }> {
+  if (photo.width && photo.height) return { width: photo.width, height: photo.height };
+  const probe = await ImageManipulator.manipulate(photo.uri).renderAsync();
+  try {
+    return { width: probe.width, height: probe.height };
+  } finally {
+    probe.release();
+  }
+}
+
 /** Resizes so the longest side is at most `side`, then JPEG-encodes as a data URI under `maxChars`. */
 async function encode(photo: LocalPhoto, side: number, maxChars: number): Promise<string> {
-  const { width = 0, height = 0 } = photo;
+  const { width, height } = await sizeOf(photo);
   const context = ImageManipulator.manipulate(photo.uri);
-  if (Math.max(width, height) > side || width === 0 || height === 0) {
+  if (Math.max(width, height) > side) {
     context.resize(width >= height ? { width: side } : { height: side });
   }
   const image = await context.renderAsync();

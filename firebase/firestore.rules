@@ -52,6 +52,13 @@ service cloud.firestore {
       return value is string && value.size() <= max;
     }
 
+    // Report photos are JPEG data URIs (apps/mobile/src/lib/firebase/photos.ts), never URLs,
+    // so a photo can't make other people's devices fetch an outside address.
+    function jpegDataUri(value, max) {
+      return value is string && value.size() > 23 && value.size() <= max
+        && value[0:23] == 'data:image/jpeg;base64,';
+    }
+
     // Field set and types for a new report, matching submitNew in reports-store.tsx.
     function validNewReport(data) {
       let fields = ['reporterId', 'title', 'category', 'street', 'area', 'reportCount', 'status',
@@ -123,7 +130,8 @@ service cloud.firestore {
           && changedOnly(['description', 'danger', 'thumbnail'])
           && validText(request.resource.data.description, 2000)
           && request.resource.data.danger is bool
-          && validText(request.resource.data.get('thumbnail', ''), 60000))
+          && (!('thumbnail' in request.resource.data)
+            || jpegDataUri(request.resource.data.thumbnail, 60000)))
         // Joining: bump reportCount by exactly 1 in the same batch that creates your
         // supporters/{uid} doc, so each person counts once. Not on a merged report: its
         // group's reportCount wouldn't include the join.
@@ -162,8 +170,7 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['uid', 'data', 'createdAt'])
           && request.resource.data.keys().hasAll(['uid', 'data', 'createdAt'])
           && request.resource.data.uid == request.auth.uid
-          && request.resource.data.data is string
-          && request.resource.data.data.size() <= 900000
+          && jpegDataUri(request.resource.data.data, 900000)
           && request.resource.data.createdAt == request.time;
         allow delete: if isStaff()
           || (signedIn() && resource.data.uid == request.auth.uid);
