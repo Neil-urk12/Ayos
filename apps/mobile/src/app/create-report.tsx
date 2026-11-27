@@ -261,6 +261,14 @@ export default function CreateReportScreen() {
                     <Text style={[styles.locationMeta, styles.locationText]}>
                       Finding your location…
                     </Text>
+                    {/* A GPS fix can take a while indoors; let the user start over. */}
+                    <Button
+                      label="Try again"
+                      variant="secondary"
+                      size="md"
+                      onPress={retryPlace}
+                      style={styles.adjust}
+                    />
                   </>
                 ) : placeState.status === 'ready' ? (
                   <>

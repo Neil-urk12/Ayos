@@ -160,7 +160,11 @@ function ConfirmCard({ report }: { report: Report }) {
       groupId,
       uid,
       (value) => setAnswer({ key: `${groupId}/${uid}`, value }),
-      (error) => console.warn('[report] Could not load your answer:', error.message),
+      (error) => {
+        console.warn('[report] Could not load your answer:', error.message);
+        // Still show the buttons; the rules refuse a second answer if there was one.
+        setAnswer({ key: `${groupId}/${uid}`, value: null });
+      },
     );
   }, [groupId, uid]);
 

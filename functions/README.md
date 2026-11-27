@@ -17,19 +17,27 @@ time weights.
 ```bash
 cd functions
 python -m venv venv
-venv/Scripts/python -m pip install -r requirements-dev.txt
-venv/Scripts/python scripts/fetch_model.py   # downloads models/mobilenetv2-embedding.onnx
+source venv/bin/activate        # Windows: venv\Scripts\activate
+python -m pip install -r requirements-dev.txt
+python scripts/fetch_model.py   # downloads models/mobilenetv2-embedding.onnx
 ```
 
 ## Test
 
+With the venv activated:
+
 ```bash
-venv/Scripts/python -m unittest discover -s tests   # scoring, embeddings, notification text
-pnpm test:functions                                  # from the repo root: end-to-end in the emulators
+python -m unittest discover -s tests   # scoring, embeddings, notification text
+pnpm test:functions                     # from the repo root: end-to-end in the emulators
 ```
 
 ## Deploy
 
-Cloud Functions need the **Blaze** plan. Run `scripts/fetch_model.py` first (the model file
-isn't in git), then `firebase deploy --only functions`. They run in `asia-southeast1`, the
-Firestore location.
+Cloud Functions need the **Blaze** plan. They run in `asia-southeast1`, the Firestore location.
+
+1. In `functions/` with the venv activated: `python scripts/fetch_model.py` (the model file
+   isn't in git).
+2. `firebase deploy --only firestore:indexes`, then wait until the `reports` index
+   (category + createdAt) shows **Enabled** in the Firebase console. `on_report_created`'s
+   query fails until it's built (the emulator doesn't need indexes, so tests won't catch this).
+3. `firebase deploy --only functions`.

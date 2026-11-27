@@ -1,6 +1,7 @@
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
+import { FirebaseError } from 'firebase/app';
 import { arrayRemove, arrayUnion, doc, updateDoc } from 'firebase/firestore';
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
@@ -53,7 +54,14 @@ export async function registerForPushNotifications(uid: string): Promise<string 
   try {
     const { data: token } = await Notifications.getDevicePushTokenAsync();
     if (typeof token !== 'string' || token.length === 0) return null;
-    await updateDoc(userRef(uid), { fcmTokens: arrayUnion(token) });
+    try {
+      await updateDoc(userRef(uid), { fcmTokens: arrayUnion(token) });
+    } catch (error) {
+      if (!(error instanceof FirebaseError && error.code === 'permission-denied')) throw error;
+      // The rules cap fcmTokens at 10, and old installs' tokens are only pruned when a send
+      // fails. Start over with this phone; the user's other phones re-add theirs on next launch.
+      await updateDoc(userRef(uid), { fcmTokens: [token] });
+    }
     return token;
   } catch (error) {
     // Expo Go, no Google Play services, or google-services.json missing from the build.

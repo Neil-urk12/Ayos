@@ -1,6 +1,7 @@
-"""Unit tests for scoring, embeddings and notification text. Run from functions/:
+"""Unit tests for scoring, embeddings and notification text. Run from functions/ with the venv
+activated (see README.md):
 
-    venv/Scripts/python -m unittest discover -s tests -v
+    python -m unittest discover -s tests -v
 """
 
 import io
