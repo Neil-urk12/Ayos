@@ -1,8 +1,11 @@
 import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+	// The app only runs in the browser (ssr = false), so test its state with Svelte's client runtime.
+	resolve: process.env.VITEST ? { conditions: ['browser'] } : undefined,
+	test: { include: ['src/**/*.test.ts'] },
 	plugins: [
 		sveltekit({
 			compilerOptions: {

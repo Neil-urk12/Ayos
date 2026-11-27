@@ -15,6 +15,7 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "eslint .",
+		"test": "vitest run",
 		"set-staff": "node scripts/set-staff.mjs",
 		"seed": "node scripts/seed.mjs"
 	},
@@ -36,6 +37,7 @@
 		"svelte-check": "^4.6.0",
 		"typescript": "^6.0.3",
 		"typescript-eslint": "^8.60.1",
-		"vite": "^8.3.0"
+		"vite": "^8.3.0",
+		"vitest": "^5.1.2"
 	}
 }

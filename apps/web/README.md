@@ -1,56 +1,32 @@
-# sv
+# Ayos staff dashboard
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+SvelteKit app for LGU staff: the priority queue, duplicate review, and the priority weights
+page. Built as a static single-page app for Firebase Hosting (`build/`, see `firebase.json`).
+See the root `README.md` for the whole monorepo.
 
-## Creating a project
-
-If you're seeing this, you've probably already done this step. Congrats!
-
-```sh
-# create a new project
-npx sv create my-app
-```
-
-To recreate this project with the same configuration:
+## Setup
 
 ```sh
-# recreate this project
-npx sv@1.3.0 create --template minimal --types ts --add prettier eslint --no-install apps/web
+cp .env.example .env   # Firebase web app config, same project as the mobile app
 ```
 
-## Adding features
+## Scripts
 
-Add features to your project with `sv add`:
+Run from `apps/web`:
 
 ```sh
-npx sv add
+pnpm dev         # dev server
+pnpm build       # static build into build/
+pnpm check       # svelte-check
+pnpm lint        # eslint
+pnpm set-staff   # grant or revoke staff access (scripts/set-staff.mjs)
+pnpm seed        # seed tips and settings/priority (scripts/seed.mjs)
 ```
 
-For example, to add Tailwind CSS:
+## Tests
+
+`src/**/*.test.ts` run against the Auth and Firestore emulators. From the repo root:
 
 ```sh
-npx sv add tailwindcss
+pnpm test:web
 ```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
-
-```sh
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.

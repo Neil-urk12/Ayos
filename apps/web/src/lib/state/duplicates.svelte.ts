@@ -1,14 +1,5 @@
-import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-import {
-	arrayUnion,
-	collection,
-	increment,
-	onSnapshot,
-	query,
-	runTransaction,
-	serverTimestamp,
-	where
-} from 'firebase/firestore';
+import { SvelteSet } from 'svelte/reactivity';
+import { arrayUnion, increment, runTransaction, serverTimestamp } from 'firebase/firestore';
 
 import { db } from '#lib/firebase.ts';
 import { staff } from './auth.svelte.ts';
@@ -69,27 +60,6 @@ export interface DuplicateSuggestion {
 		newDot: { x: string; y: string };
 		groupDot: { x: string; y: string };
 	};
-}
-
-/**
- * Photo similarity (0–1) per "{reportId}_{groupId}", from the pending duplicateSuggestions the
- * on_report_created Cloud Function writes after comparing photos with its image model.
- */
-const imageScores = new SvelteMap<string, number>();
-
-/** Starts listening for the function's photo comparisons; returns a function that stops. */
-export function startImageScores() {
-	return onSnapshot(
-		query(collection(db, 'duplicateSuggestions'), where('decision', '==', 'pending')),
-		(snap) => {
-			imageScores.clear();
-			for (const d of snap.docs) {
-				const value = d.get('imageSimilarity');
-				if (typeof value === 'number') imageScores.set(d.id, value);
-			}
-		},
-		(error) => console.warn('[duplicates] Could not load photo comparisons:', error)
-	);
 }
 
 /**
@@ -167,13 +137,23 @@ function buildSuggestion(
 }
 
 /** For each unreviewed report, its best-scoring older group nearby in the same category. */
-function findSuggestions(docs: ReportDoc[], skipped: ReadonlySet<string>): DuplicateSuggestion[] {
+export function findSuggestions(
+	docs: ReportDoc[],
+	skipped: ReadonlySet<string>
+): DuplicateSuggestion[] {
 	const { radiusMeters, windowDays, threshold } = settings.current.duplicates;
-	const groups = docs.filter((d) => !d.mergedInto);
+	// Oldest first, so each report only walks back through the groups inside the time window.
+	const groups = docs
+		.filter((d) => !d.mergedInto)
+		.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 	const suggestions: DuplicateSuggestion[] = [];
 
-	for (const report of groups) {
+	for (const [index, report] of groups.entries()) {
 		if (report.status === 'resolved' || report.recurrenceOf) continue;
+		const time = report.createdAt.getTime();
+		// Groups created at the same instant can match too; they may sort after the report.
+		let start = index;
+		while (start + 1 < groups.length && groups[start + 1].createdAt.getTime() === time) start++;
 		let best: {
 			group: ReportDoc;
 			distance: number;
@@ -182,17 +162,18 @@ function findSuggestions(docs: ReportDoc[], skipped: ReadonlySet<string>): Dupli
 			image: number | null;
 		} | null = null;
 
-		for (const group of groups) {
+		for (let i = start; i >= 0; i--) {
+			const group = groups[i];
+			const gapDays = Math.floor((time - group.createdAt.getTime()) / DAY_MS);
+			if (gapDays > windowDays) break; // Every group before this one is older still.
 			if (group.id === report.id || group.category !== report.category) continue;
-			if (group.createdAt.getTime() > report.createdAt.getTime()) continue;
 			if (report.notDuplicateOf?.includes(group.id)) continue;
 			if (skipped.has(`${report.id}->${group.id}`)) continue;
 
 			const distance = reportDistance(report, group);
-			const gapDays = Math.floor((report.createdAt.getTime() - group.createdAt.getTime()) / DAY_MS);
-			if (distance > radiusMeters || gapDays > windowDays) continue;
+			if (distance > radiusMeters) continue;
 
-			const image = imageScores.get(`${report.id}_${group.id}`) ?? null;
+			const image = report.imageScores?.[group.id] ?? null;
 			const score = matchScore(distance, gapDays, image);
 			if (score >= threshold && (!best || score > best.score)) {
 				best = { group, distance, gapDays, score, image };
@@ -206,12 +187,8 @@ function findSuggestions(docs: ReportDoc[], skipped: ReadonlySet<string>): Dupli
 		}
 	}
 
-	// Oldest waiting first.
-	return suggestions.sort(
-		(a, b) =>
-			(reports.byId(a.newReport.code)?.createdAt.getTime() ?? 0) -
-			(reports.byId(b.newReport.code)?.createdAt.getTime() ?? 0)
-	);
+	// Already oldest waiting first, because groups is.
+	return suggestions;
 }
 
 class DuplicateReviewState {

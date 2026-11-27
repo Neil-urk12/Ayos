@@ -1,6 +1,7 @@
 import { doc, setDoc } from 'firebase/firestore';
 
 import { db } from '#lib/firebase.ts';
+import { priorityScore } from './queue.svelte.ts';
 import { DEFAULT_SETTINGS, settings, type Settings } from './settings.svelte.ts';
 
 export interface WeightFactor {
@@ -53,19 +54,13 @@ class WeightsState {
 
 	isBalanced = $derived(Math.abs(this.totalWeight - 1.0) < 0.005);
 
-	// Live preview using the sample "Deep pothole, northbound lane" inputs (Severity 4/5, High safety, 9 days, 6 reports)
+	// Live preview using the sample "Deep pothole, northbound lane" inputs (Severity 4/5, High
+	// safety, 9 days, 6 reports), scored by the queue's own formula with the unsaved weights.
 	previewScore = $derived.by(() => {
-		const normalizedInputs: Record<WeightFactor['id'], number> = {
-			severity: 80, // 4 / 5
-			safety: 90, // High
-			age: 85, // 9 days
-			reports: 95 // 6 reports
-		};
-		const raw = this.factors.reduce(
-			(acc, f) => acc + normalizedInputs[f.id] * Number(f.weight || 0),
-			0
-		);
-		return Math.min(100, Math.max(0, Math.round(raw)));
+		const w = Object.fromEntries(
+			this.factors.map((f) => [f.id, Number(f.weight || 0)])
+		) as Settings['weights'];
+		return Math.min(100, Math.max(0, priorityScore(4, 'High', 9, 6, w)));
 	});
 
 	/** Shows `s` in the form, replacing any unsaved edits. */

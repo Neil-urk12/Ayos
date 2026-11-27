@@ -131,7 +131,7 @@
 				</div>
 				<p class="metric-hint">
 					{item.metrics.imageSimilarity === null
-						? 'Not compared yet: report photos aren’t uploaded'
+						? 'Not compared: no photo score for this pair yet'
 						: 'Photo embeddings compared by cosine similarity'}
 				</p>
 			</div>

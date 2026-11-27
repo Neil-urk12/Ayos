@@ -67,6 +67,8 @@ export interface ReportDoc {
 	notDuplicateOf?: string[];
 	/** A fixed group this report was flagged as a recurrence of. */
 	recurrenceOf?: string;
+	/** Photo similarity (0–1) to each nearby group, keyed by group id, from on_report_created. */
+	imageScores?: Record<string, number>;
 }
 
 /** Metres covered by the full width/height of the mobile app's neighbourhood map. */

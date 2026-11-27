@@ -2,6 +2,7 @@ import {
 	arrayUnion,
 	deleteField,
 	increment,
+	runTransaction,
 	serverTimestamp,
 	updateDoc,
 	writeBatch
@@ -21,7 +22,8 @@ import {
 	type ReportDoc,
 	type StatusCode
 } from './reports.svelte.ts';
-import { settings } from './settings.svelte.ts';
+import { csvCell } from './report-list.svelte.ts';
+import { settings, type Settings } from './settings.svelte.ts';
 
 export type IssueStatus = 'In progress' | 'Verified' | 'Received' | 'Resolved';
 
@@ -77,11 +79,16 @@ const DEFAULT_SEVERITY = 2;
 const safetyFill: Record<string, number> = { High: 0.9, Medium: 0.6, Low: 0.35 };
 
 /**
- * Priority score, 0–100, with the weights from settings/priority. Same bars as the
- * breakdown on the issue page.
+ * Priority score, 0–100, with the weights from settings/priority (or `w`, for the weights
+ * page preview). Same bars as the breakdown on the issue page.
  */
-function priorityScore(severity: number, safetyImpact: string, ageDays: number, count: number) {
-	const w = settings.current.weights;
+export function priorityScore(
+	severity: number,
+	safetyImpact: string,
+	ageDays: number,
+	count: number,
+	w: Settings['weights'] = settings.current.weights
+) {
 	return Math.round(
 		100 *
 			(w.severity * (severity / 5) +
@@ -183,7 +190,9 @@ class QueueState {
 			: (this.items.find((item) => item.id === this.selectedIssueId) ?? null)
 	);
 
-	criticalCount = $derived(this.filteredItems.filter((i) => i.score >= settings.current.criticalThreshold).length);
+	criticalCount = $derived(
+		this.filteredItems.filter((i) => i.score >= settings.current.criticalThreshold).length
+	);
 
 	/** Reports behind the listed groups. */
 	reportTotal = $derived(this.filteredItems.reduce((sum, i) => sum + i.reports, 0));
@@ -261,51 +270,56 @@ class QueueState {
 
 	/** Splits a merged report back out into its own group. */
 	async unmergeReport(issueId: string, reportCode: string) {
-		const child = reports.byId(reportCode);
-		if (!child) return;
-		const batch = writeBatch(db);
-		const patch: Record<string, unknown> = {
-			mergedInto: deleteField(),
-			mergeScore: deleteField(),
-			mergedBy: deleteField(),
-			mergedAt: deleteField(),
-			// Don't suggest the same match again in duplicate review.
-			notDuplicateOf: arrayUnion(issueId)
-		};
-		// Put back the report's own status; the group's was copied over it on merge and kept in
-		// sync since. Reports merged before preMerge existed keep the group's values.
-		const pre = child.preMerge;
-		if (pre) {
-			Object.assign(patch, {
-				preMerge: deleteField(),
-				status: pre.status,
-				statusNote: pre.statusNote ?? deleteField(),
-				assignedTo: pre.assignedTo ?? deleteField(),
-				// Duplicate review never offers resolved reports, so these were never its own.
-				resolvedOn: deleteField(),
-				awaitingConfirmation: deleteField()
-			});
-			// If it was verified before the merge, verifiedAtTs is still its own; else both came later.
-			if (pre.verifiedAt) patch.verifiedAt = pre.verifiedAt;
-			else Object.assign(patch, { verifiedAt: deleteField(), verifiedAtTs: deleteField() });
-		}
-		batch.update(reportRef(reportCode), patch);
-		batch.update(reportRef(issueId), { reportCount: increment(-child.reportCount) });
-		// Undoing a merge means the match was wrong; record that for the evaluation.
-		batch.set(
-			suggestionRef(reportCode, issueId),
-			{
-				reportId: reportCode,
-				candidateGroupId: issueId,
-				decision: 'rejected',
-				unmerged: true,
-				reviewedBy: staff.user?.uid ?? '',
-				reviewedAt: serverTimestamp()
-			},
-			{ merge: true }
-		);
 		try {
-			await batch.commit();
+			await runTransaction(db, async (tx) => {
+				// Read inside the transaction: another staff member or a stale tab may have unmerged
+				// it already, and subtracting its count twice would leave the group undercounted.
+				const snap = await tx.get(reportRef(reportCode));
+				const child = snap.data() as ReportDoc | undefined;
+				if (!child) throw new Error(`${reportCode} no longer exists.`);
+				if (child.mergedInto !== issueId)
+					throw new Error(`${reportCode} is no longer merged into ${issueId}.`);
+				const patch: Record<string, unknown> = {
+					mergedInto: deleteField(),
+					mergeScore: deleteField(),
+					mergedBy: deleteField(),
+					mergedAt: deleteField(),
+					// Don't suggest the same match again in duplicate review.
+					notDuplicateOf: arrayUnion(issueId)
+				};
+				// Put back the report's own status; the group's was copied over it on merge and kept
+				// in sync since. Reports merged before preMerge existed keep the group's values.
+				const pre = child.preMerge;
+				if (pre) {
+					Object.assign(patch, {
+						preMerge: deleteField(),
+						status: pre.status,
+						statusNote: pre.statusNote ?? deleteField(),
+						assignedTo: pre.assignedTo ?? deleteField(),
+						// Duplicate review never offers resolved reports, so these were never its own.
+						resolvedOn: deleteField(),
+						awaitingConfirmation: deleteField()
+					});
+					// If it was verified before the merge, verifiedAtTs is still its own; else both came later.
+					if (pre.verifiedAt) patch.verifiedAt = pre.verifiedAt;
+					else Object.assign(patch, { verifiedAt: deleteField(), verifiedAtTs: deleteField() });
+				}
+				tx.update(reportRef(reportCode), patch);
+				tx.update(reportRef(issueId), { reportCount: increment(-(child.reportCount ?? 1)) });
+				// Undoing a merge means the match was wrong; record that for the evaluation.
+				tx.set(
+					suggestionRef(reportCode, issueId),
+					{
+						reportId: reportCode,
+						candidateGroupId: issueId,
+						decision: 'rejected',
+						unmerged: true,
+						reviewedBy: staff.user?.uid ?? '',
+						reviewedAt: serverTimestamp()
+					},
+					{ merge: true }
+				);
+			});
 			this.feedback = `Unmerged ${reportCode} from ${issueId}.`;
 		} catch (error) {
 			this.feedback = `Couldn't unmerge ${reportCode}: ${errorText(error)}`;
@@ -349,15 +363,15 @@ class QueueState {
 		];
 		const rows = this.filteredItems.map((item, idx) => [
 			idx + 1,
-			`"${item.groupCode}"`,
-			`"${item.title.replaceAll('"', '""')}"`,
-			`"${item.category}"`,
-			`"${item.street.replaceAll('"', '""')}"`,
-			`"${item.barangay.replaceAll('"', '""')}"`,
+			csvCell(item.groupCode),
+			csvCell(item.title),
+			csvCell(item.category),
+			csvCell(item.street),
+			csvCell(item.barangay),
 			item.reports,
 			item.ageDays,
 			item.score,
-			`"${item.status}"`
+			csvCell(item.status)
 		]);
 		const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
 		const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
