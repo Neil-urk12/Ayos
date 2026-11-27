@@ -71,7 +71,6 @@ function RootNavigator() {
           <Stack.Screen name="create-report" />
           <Stack.Screen name="duplicate-check" />
           <Stack.Screen name="report/[id]" />
-          <Stack.Screen name="explore" />
         </Stack.Protected>
         <Stack.Protected guard={!signedIn} redirectTo="/map">
           <Stack.Screen name="index" />
