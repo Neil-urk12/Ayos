@@ -160,9 +160,11 @@ service cloud.firestore {
             || jpegDataUri(request.resource.data.thumbnail, 60000)))
         // Joining: bump reportCount by exactly 1 in the same batch that creates your
         // supporters/{uid} doc, so each person counts once. Not on a merged report: its
-        // group's reportCount wouldn't include the join.
+        // group's reportCount wouldn't include the join. Not on a resolved one either: the
+        // staff queue hides it, so a recurrence has to be filed as a new report.
         || (isResident()
           && !('mergedInto' in resource.data)
+          && resource.data.status != 'resolved'
           && changedOnly(['reportCount'])
           && request.resource.data.reportCount == resource.data.reportCount + 1
           && !exists(supporterPath(reportId))
@@ -194,8 +196,9 @@ service cloud.firestore {
               && request.resource.data.statusNote == 'Reopened after you said it is still broken'
               && !('resolvedOn' in request.resource.data))));
 
-      allow delete: if isStaff()
-        || (isOwner(resource.data.reporterId) && resource.data.status == 'received');
+      // Staff only: others may have joined the report or had theirs merged into it, and a
+      // deleted lead leaves its merged reports hidden from the queue.
+      allow delete: if isStaff();
 
       // reports/{reportId}/photos/{uid}_{n}: report photos as JPEG data URIs (kept in Firestore
       // so the project can stay on the Spark plan). Anyone who filed or joined the report may

@@ -1,22 +1,11 @@
 rules_version = '2';
 
+// Report photos live in Firestore (reports/{id}/photos), so nothing uses Cloud Storage.
+// Kept deployed as deny-all so an old, open rule set can't stay live.
 service firebase.storage {
   match /b/{bucket}/o {
-    // Report photos: users/{uid}/reports/{reportId}/{file}
-    match /users/{uid}/reports/{reportId}/{file} {
-      allow read: if request.auth != null;
-
-      // Uploads must be images under 10 MB. request.resource only exists on create/update.
-      // Guests (anonymous auth) can't file reports, so they can't upload report photos either.
-      allow create, update: if request.auth != null
-        && request.auth.uid == uid
-        && request.auth.token.firebase.sign_in_provider != 'anonymous'
-        && request.resource.size < 10 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
-
-      allow delete: if request.auth != null && request.auth.uid == uid;
+    match /{allPaths=**} {
+      allow read, write: if false;
     }
-
-    // Everything else is denied by default.
   }
 }

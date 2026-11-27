@@ -297,10 +297,18 @@ describe('signed-up residents', () => {
     await assertFails(deleteDoc(doc(resident('bob').firestore(), 'reports', ALICE_REPORT)));
   });
 
+  it('cannot delete their own report, even while it is still received', async () => {
+    await assertFails(deleteDoc(doc(resident('alice').firestore(), 'reports', ALICE_REPORT)));
+  });
+
   it('can join another user’s report once, adding exactly one', async () => {
     const db = resident('bob').firestore();
     await assertSucceeds(joinReport(db, ALICE_REPORT, 'bob'));
     await assertFails(joinReport(db, ALICE_REPORT, 'bob'));
+  });
+
+  it('cannot join a resolved report (a recurrence is filed as a new report)', async () => {
+    await assertFails(joinReport(resident('bob').firestore(), FIXED_REPORT, 'bob'));
   });
 
   it('cannot inflate the report count', async () => {
@@ -445,15 +453,8 @@ describe('merging duplicates', () => {
 });
 
 describe('storage', () => {
-  it('a resident can upload a photo to their own folder', async () => {
+  it('is closed: photos live in Firestore, so not even your own folder takes uploads', async () => {
     const photo = ref(resident('bob').storage(), 'users/bob/reports/AY-BOB001/photo.jpg');
-    await assertSucceeds(
-      uploadBytes(photo, new Uint8Array([1, 2, 3]), { contentType: 'image/jpeg' }),
-    );
-  });
-
-  it("a resident cannot upload into another user's folder", async () => {
-    const photo = ref(resident('bob').storage(), 'users/alice/reports/AY-ALICE1/photo.jpg');
     await assertFails(uploadBytes(photo, new Uint8Array([1, 2, 3]), { contentType: 'image/jpeg' }));
   });
 });
