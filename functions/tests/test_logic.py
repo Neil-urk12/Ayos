@@ -65,31 +65,6 @@ class ScoringTest(unittest.TestCase):
         self.assertGreater(same, D.threshold)
         self.assertLess(different, D.threshold)
 
-    def test_best_match_filters_like_the_dashboard(self):
-        new = report(notDuplicateOf=["AY-REJECT"])
-        groups = [
-            ("AY-NEW", new),  # itself
-            ("AY-OTHER", report(category="drainage", createdAt=NOW - timedelta(days=1))),
-            ("AY-FAR", report(map={"x": 0.5, "y": 0.53}, createdAt=NOW - timedelta(days=1))),
-            ("AY-OLD", report(createdAt=NOW - timedelta(days=60))),
-            ("AY-LATER", report(createdAt=NOW + timedelta(days=1))),
-            ("AY-MERGED", report(mergedInto="AY-X", createdAt=NOW - timedelta(days=1))),
-            ("AY-REJECT", report(createdAt=NOW - timedelta(days=1))),
-            ("AY-MATCH", report(map={"x": 0.441, "y": 0.53}, createdAt=NOW - timedelta(days=2))),
-        ]
-        match = scoring.best_match(new, "AY-NEW", groups, lambda _: None, D)
-        self.assertIsNotNone(match)
-        self.assertEqual(match.group_id, "AY-MATCH")
-        self.assertEqual(match.days, 2)
-        self.assertAlmostEqual(match.distance, 3, places=5)
-
-    def test_best_match_drops_visually_different_photos(self):
-        new = report()
-        # 6 m and 3 days apart: a match on location alone (0.84), so the photo decides.
-        groups = [("AY-G", report(map={"x": 0.442, "y": 0.53}, createdAt=NOW - timedelta(days=3)))]
-        self.assertIsNotNone(scoring.best_match(new, "AY-NEW", groups, lambda _: 0.95, D))
-        self.assertIsNone(scoring.best_match(new, "AY-NEW", groups, lambda _: 0.1, D))
-
     def test_priority_matches_dashboard_formula(self):
         w = scoring.PriorityWeights()
         # 100 * (0.35*2/5 + 0.3*0.6 + 0.15*min(1, 3*0.07) + 0.2*min(1, 2*0.15)) = 41.15 -> 41

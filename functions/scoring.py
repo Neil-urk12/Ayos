@@ -136,50 +136,6 @@ def match_score(
     return (d.image_weight * image_similarity + closeness + recency) / total
 
 
-@dataclass(frozen=True)
-class Candidate:
-    group_id: str
-    distance: float
-    days: int
-    image_similarity: float | None
-    score: float
-
-
-def best_match(
-    report: Mapping[str, Any],
-    report_id: str,
-    groups: Iterable[tuple[str, Mapping[str, Any]]],
-    similarity_for: Any,
-    d: DuplicateSettings,
-) -> Candidate | None:
-    """The best-scoring older open group nearby in the same category, at or above the threshold.
-
-    `groups` are (id, data) of reports that aren't merged into another. `similarity_for(group_id)`
-    returns the image similarity to that group, or None when either side has no photo.
-    Same filters as findSuggestions on the dashboard.
-    """
-    created: datetime = report["createdAt"]
-    not_duplicate_of = set(report.get("notDuplicateOf") or [])
-    best: Candidate | None = None
-    for group_id, group in groups:
-        if group_id == report_id or group.get("category") != report.get("category"):
-            continue
-        if group.get("mergedInto") or group_id in not_duplicate_of:
-            continue
-        group_created: datetime | None = group.get("createdAt")
-        if group_created is None or group_created > created:
-            continue
-        distance = report_distance(report, group)
-        days = gap_days(created, group_created)
-        if distance > d.radius_meters or days > d.window_days:
-            continue
-        similarity = similarity_for(group_id)
-        score = match_score(distance, days, similarity, d)
-        if score >= d.threshold and (best is None or score > best.score):
-            best = Candidate(group_id, distance, days, similarity, score)
-    return best
-
-
 def safety_impact(members: Iterable[Mapping[str, Any]]) -> str:
     return "High" if any(m.get("danger") for m in members) else "Medium"
 

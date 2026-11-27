@@ -3,7 +3,7 @@
     pnpm test:functions
 
 Writes two reports of the same pothole (with photos) and one unrelated report, then checks
-that the functions embedded the photos, suggested the duplicate, and scored priority.
+that the functions embedded the photos, scored photo similarity, and scored priority.
 """
 
 import base64
@@ -82,21 +82,17 @@ wait_for("group priority scored", lambda: (doc("reports/AY-GROUP1") or {}).get("
 add_report(
     "AY-LIGHT1", "dave", streetlight(), NOW - timedelta(days=1), map={"x": 0.4415, "y": 0.53}
 )
+wait_for("streetlight photo embedded", lambda: doc("embeddings/AY-LIGHT1"))
 add_report("AY-NEW001", "alice", pothole(shift=15).rotate(3), NOW, map={"x": 0.4418, "y": 0.53})
 
-suggestion = wait_for("duplicate suggested", lambda: doc("duplicateSuggestions/AY-NEW001_AY-GROUP1"))
-print(
-    f"     image {suggestion['imageSimilarity']:.2f}, {suggestion['distanceM']} m, "
-    f"{suggestion['timeGapDays']} days -> {suggestion['combinedScore']:.2f} ({suggestion['decision']})"
-)
-assert suggestion["imageSimilarity"] > 0.8, suggestion
-assert suggestion["decision"] == "pending"
-
-# The streetlight is 4.5 m from the group but looks nothing like it: no suggestion... unless it
-# beats the pothole on location and time alone. The new pothole must have picked the pothole.
-time.sleep(3)
-assert doc("duplicateSuggestions/AY-NEW001_AY-LIGHT1") is None, "matched the different photo"
-print("ok   different-looking report not suggested")
+scores = wait_for("photos compared", lambda: (doc("reports/AY-NEW001") or {}).get("imageScores"))
+print(f"     image similarity {scores}")
+assert scores.get("AY-GROUP1", 0) > 0.8, scores
+# The streetlight is closer than the pothole group but looks nothing like the new pothole. Its
+# score must be saved too, so the dashboard can rule it out instead of matching on location.
+assert "AY-LIGHT1" in scores, scores
+assert scores["AY-LIGHT1"] < scores["AY-GROUP1"], scores
+print("ok   different-looking report scored lower")
 
 before = doc("reports/AY-GROUP1")["priorityScore"]
 db.document("reports/AY-GROUP1").update({"severity": 5})

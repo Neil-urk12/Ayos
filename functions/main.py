@@ -1,9 +1,9 @@
 """Ayos Cloud Functions (Python).
 
 - on_report_created (FR-15): when a new report's first photo is saved, embeds it with a
-  pretrained MobileNetV2, compares it with nearby open issue groups (image similarity +
-  distance + time gap), and writes a pending duplicateSuggestions record if the combined
-  score meets the threshold in settings/priority.
+  pretrained MobileNetV2, compares it with nearby open issue groups, and saves the photo
+  similarity to each one as imageScores on the report. The staff dashboard combines it with
+  distance and time gap to decide what to suggest.
 - recalculate_priority* (FR-18): keeps priorityScore (0–100) on each issue group's lead
   report up to date when the group, the weights or the day changes.
 - notify_reporters (FR-12, FR-20): sends status-change and LGU-update notifications to
@@ -41,7 +41,6 @@ PHOTOS = "photos"
 SUPPORTERS = "supporters"
 USERS = "users"
 EMBEDDINGS = "embeddings"
-SUGGESTIONS = "duplicateSuggestions"
 
 # Changes to these on a report can change its group's priority score.
 PRIORITY_FIELDS = ("severity", "reportCount", "status", "danger", "mergedInto", "createdAt")
@@ -114,13 +113,15 @@ def on_report_created(event: firestore_fn.Event[firestore_fn.DocumentSnapshot | 
 
     settings = _settings().duplicates
     # Only reports inside the time window can match, so don't read older ones. The extra day
-    # covers gap_days rounding down; best_match applies the exact window.
+    # covers the dashboard's gap rounding down; the dashboard applies the exact window.
     oldest = report["createdAt"] - timedelta(days=settings.window_days + 1)
     candidates = [
         (snap.id, snap.to_dict())
         for snap in db.collection(REPORTS)
         .where(filter=FieldFilter("category", "==", report.get("category")))
         .where(filter=FieldFilter("createdAt", ">=", oldest))
+        # Only what's read below; skips the thumbnails (up to 60 KB each).
+        .select(["location", "map", "mergedInto"])
         .stream()
     ]
     nearby_ids = [
@@ -131,37 +132,15 @@ def on_report_created(event: firestore_fn.Event[firestore_fn.DocumentSnapshot | 
         and scoring.report_distance(report, group) <= settings.radius_meters
     ]
     group_vectors = _group_embeddings(nearby_ids) if vector and nearby_ids else {}
-
-    def similarity_for(group_id: str) -> float | None:
-        vectors = group_vectors.get(group_id) or []
-        if not vector or not vectors:
-            return None
-        return max(embedding.similarity(vector, v) for v in vectors)
-
-    match = scoring.best_match(report, report_id, candidates, similarity_for, settings)
-    if match is None:
-        log.info("No duplicate found for %s", report_id)
-        return
-
-    suggestion = db.collection(SUGGESTIONS).document(f"{report_id}_{match.group_id}")
-    try:
-        # create(), not set(): never overwrite a decision staff already made.
-        suggestion.create(
-            {
-                "reportId": report_id,
-                "candidateGroupId": match.group_id,
-                "imageSimilarity": match.image_similarity,
-                "distanceM": round(match.distance, 1),
-                "timeGapDays": match.days,
-                "combinedScore": round(match.score, 4),
-                "decision": "pending",
-                "model": embedding.MODEL_NAME if match.image_similarity is not None else None,
-                "createdAt": firestore.SERVER_TIMESTAMP,
-            }
-        )
-        log.info("Suggested %s as a duplicate of %s (%.2f)", report_id, match.group_id, match.score)
-    except Exception as error:  # AlreadyExists: reviewed or suggested before.
-        log.info("Suggestion for %s not written: %s", report_id, error)
+    # Every compared group, not just matches, so a low score can rule a match out too.
+    scores = {
+        gid: round(max(embedding.similarity(vector, v) for v in vectors), 4)
+        for gid, vectors in group_vectors.items()
+        if vectors
+    }
+    if scores:
+        db.collection(REPORTS).document(report_id).update({"imageScores": scores})
+    log.info("Compared %s with %d nearby groups", report_id, len(scores))
 
 
 # ---------------------------------------------------------------------------------------------
