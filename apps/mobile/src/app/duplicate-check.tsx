@@ -37,6 +37,9 @@ export default function DuplicateCheckScreen() {
 
   // People besides you who already reported it.
   const people = othersCount(match.report);
+  // Matches are sorted open first, so this means every match is fixed. Joining a fixed report
+  // hides yours from the staff queue, so a problem that came back is filed as a new report.
+  const fixed = match.report.status === 'resolved';
 
   return (
     <View style={styles.screen}>
@@ -44,8 +47,9 @@ export default function DuplicateCheckScreen() {
 
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.intro}>
-          We found a report that looks like yours, close by. If it&apos;s the same problem, add
-          yours to it. Your photo still goes to the LGU.
+          {fixed
+            ? 'We found a report like yours close by, but the LGU marked it fixed. If the problem is back, report it again so they see it.'
+            : 'We found a report that looks like yours, close by. If it’s the same problem, add yours to it. Your photo still goes to the LGU.'}
         </Text>
 
         <View style={styles.matchCard}>
@@ -109,10 +113,14 @@ export default function DuplicateCheckScreen() {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-        <Button
-          label="Same problem, add my report"
-          onPress={() => showReport(joinExisting(match.report.id))}
-        />
+        {fixed ? (
+          <Button label="It’s back, report it again" onPress={() => showReport(submitNew(draft))} />
+        ) : (
+          <Button
+            label="Same problem, add my report"
+            onPress={() => showReport(joinExisting(match.report.id))}
+          />
+        )}
         <Button label="Different problem, submit new" variant="secondary" onPress={submitAsNew} />
         <Text style={styles.footerNote}>Not sure? Submit new. LGU staff check every match.</Text>
       </View>

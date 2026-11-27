@@ -13,7 +13,8 @@ import {
   newReportId,
   reportErrorMessage,
   watchJoinedReportIds,
-  watchReports,
+  watchOpenReports,
+  watchReportsById,
   type Confirmation,
   type ReportSnapshot,
 } from '../lib/firebase/reports';
@@ -141,11 +142,12 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
   // Tagged with the uid they were loaded for, so another account's data is never shown.
   const [loaded, setLoaded] = useState<{ uid: string; docs: ReportSnapshot[] } | null>(null);
   const [joined, setJoined] = useState<{ uid: string; ids: Set<string> } | null>(null);
+  const [own, setOwn] = useState<{ uid: string; docs: ReportSnapshot[] } | null>(null);
   const [draft, setDraft] = useState<ReportDraft | null>(null);
 
   useEffect(() => {
     if (!uid) return;
-    return watchReports(
+    return watchOpenReports(
       (docs) => setLoaded({ uid, docs }),
       (error) => console.warn('[reports] Could not load reports:', error.message),
     );
@@ -161,8 +163,24 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
     );
   }, [uid, isGuest]);
 
-  const docs = loaded && loaded.uid === uid ? loaded.docs : [];
   const joinedIds = joined && joined.uid === uid ? joined.ids : new Set<string>();
+  // A string, so the listener below only restarts when the set of ids actually changes.
+  const joinedKey = [...joinedIds].filter(Boolean).sort().join(',');
+
+  // The open-reports listener skips resolved ones, so load the user's own by id.
+  useEffect(() => {
+    if (!uid || !joinedKey) return;
+    return watchReportsById(
+      joinedKey.split(','),
+      (docs) => setOwn({ uid, docs }),
+      (error) => console.warn('[reports] Could not load your reports:', error.message),
+    );
+  }, [uid, joinedKey]);
+
+  const openDocs = loaded && loaded.uid === uid ? loaded.docs : [];
+  const ownDocs = own && own.uid === uid ? own.docs : [];
+  // A reopened or still-open report of yours is in both lists; keep one copy.
+  const docs = [...new Map([...openDocs, ...ownDocs].map((d) => [d.id, d])).values()];
   // Newest first, like the old in-memory list.
   const reports = [...docs]
     .sort((a, b) => createdMs(b.data) - createdMs(a.data))
@@ -224,8 +242,23 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
     },
     joinExisting: (id) => {
       const report = reports.find((r) => r.id === id);
-      if (uid && report && !report.mine) {
-        const photos = draft?.photos ?? [];
+      if (!uid || !report) return id;
+      const photos = draft?.photos ?? [];
+      // Already on the report (filed or joined): no second join, but the new photos still count.
+      const addPhotosAsSupporter = async () => {
+        try {
+          await savePhotos(id, uid, photos);
+        } catch (photoError) {
+          const denied =
+            photoError instanceof FirebaseError && photoError.code === 'permission-denied';
+          if (!denied) throw photoError;
+          // Photos can't be replaced, so they already added some on an earlier join.
+          Alert.alert(PHOTO_UPLOAD_ERROR, 'You’ve already added photos to this report.');
+        }
+      };
+      if (report.mine) {
+        addPhotosAsSupporter().catch(showPhotoError);
+      } else {
         joinReport(id, uid)
           .then(
             async () => {
@@ -241,6 +274,8 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
               // supporter (the joined-ids snapshot hadn't loaded yet) or staff merged the report
               // meanwhile. Only the second loses the join, so only that one is worth telling.
               // null = couldn't tell; don't guess, since saving photos on a merged report fails.
+              // shortcut: staff resolving it meanwhile also denies the join and lands here as
+              // "already added photos"; check status on the server too if that race shows up.
               const group = await mergedIntoOnServer(id).catch(() => null);
               if (group === null) return;
               if (group) {
@@ -250,16 +285,7 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
                 );
                 return;
               }
-              // Already a supporter: the new photos still belong on the report.
-              try {
-                await savePhotos(id, uid, photos);
-              } catch (photoError) {
-                const denied =
-                  photoError instanceof FirebaseError && photoError.code === 'permission-denied';
-                if (!denied) throw photoError;
-                // Photos can't be replaced, so they already added some on an earlier join.
-                Alert.alert(PHOTO_UPLOAD_ERROR, 'You’ve already added photos to this report.');
-              }
+              await addPhotosAsSupporter();
             },
           )
           .catch(showPhotoError);

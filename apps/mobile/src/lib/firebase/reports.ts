@@ -4,6 +4,7 @@ import {
   collectionGroup,
   deleteField,
   doc,
+  documentId,
   GeoPoint,
   getDocFromServer,
   increment,
@@ -14,6 +15,7 @@ import {
   where,
   writeBatch,
   type DocumentData,
+  type QuerySnapshot,
   type Unsubscribe,
 } from 'firebase/firestore';
 
@@ -70,19 +72,47 @@ export function newReportId() {
   return `AY-${suffix}`;
 }
 
-/** Calls back with every report, including pending local writes. */
-export function watchReports(
+const toSnapshots = (snap: QuerySnapshot): ReportSnapshot[] =>
+  snap.docs.map((d) => ({ id: d.id, data: d.data({ serverTimestamps: 'estimate' }) }));
+
+// shortcut: every open report in the city loads on launch (thumbnails up to 60 KB each), since
+// the cache is in memory only; add geohashQueryBounds around the user if open reports near ~1,000.
+/** Calls back with every unresolved report, including pending local writes. */
+export function watchOpenReports(
   onChange: (reports: ReportSnapshot[]) => void,
   onError: (error: Error) => void,
 ): Unsubscribe {
   return onSnapshot(
-    collection(db, collections.reports),
-    (snap) =>
-      onChange(
-        snap.docs.map((d) => ({ id: d.id, data: d.data({ serverTimestamps: 'estimate' }) })),
-      ),
+    query(
+      collection(db, collections.reports),
+      where('status', 'in', ['received', 'verified', 'in_progress']),
+    ),
+    (snap) => onChange(toSnapshots(snap)),
     onError,
   );
+}
+
+/** Calls back with these reports (the user's own, resolved ones included) as one list. */
+export function watchReportsById(
+  ids: string[],
+  onChange: (reports: ReportSnapshot[]) => void,
+  onError: (error: Error) => void,
+): Unsubscribe {
+  // An `in` filter takes at most 30 values, so listen in chunks and report them together.
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30));
+  const results: ReportSnapshot[][] = chunks.map(() => []);
+  const unsubscribes = chunks.map((chunk, i) =>
+    onSnapshot(
+      query(collection(db, collections.reports), where(documentId(), 'in', chunk)),
+      (snap) => {
+        results[i] = toSnapshots(snap);
+        onChange(results.flat());
+      },
+      onError,
+    ),
+  );
+  return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
 }
 
 /** Calls back with the ids of every report the user filed or joined. */

@@ -48,6 +48,7 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const PROFILE_SAVE_TIMEOUT_MS = 15_000;
+const PUSH_TOKEN_REMOVE_TIMEOUT_MS = 5_000;
 
 /** Rejects with a FirebaseError-like 'deadline-exceeded' code if `promise` takes too long. */
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -166,7 +167,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Stop notifications to this phone first: once signed out, the profile can't be written.
       const saved = pushToken.current;
       pushToken.current = null;
-      if (saved) await unregisterPushToken(saved.uid, saved.token).catch(() => undefined);
+      // Offline, the write never resolves (it waits for the server), so don't block on it.
+      // shortcut: if it times out, the token stays on the profile and this phone keeps getting
+      // that user's notifications; prune it server-side if that matters.
+      if (saved) {
+        await withTimeout(
+          unregisterPushToken(saved.uid, saved.token),
+          PUSH_TOKEN_REMOVE_TIMEOUT_MS,
+        ).catch(() => undefined);
+      }
       await firebaseSignOut(auth);
     },
     resetPassword: (email) => sendPasswordResetEmail(auth, email.trim()),
