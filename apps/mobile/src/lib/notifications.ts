@@ -84,9 +84,14 @@ function openReport(response: Notifications.NotificationResponse | null | undefi
 
 /**
  * Opens the report when a notification is tapped, including one that launched the app.
- * Mount once, inside the signed-in screens.
+ * Mount once, inside the signed-in screens. Does nothing on web, where expo-notifications
+ * has no getLastNotificationResponse (and this app has no web push).
  */
-export function useOpenReportFromNotification(enabled: boolean) {
+export const useOpenReportFromNotification: (enabled: boolean) => void =
+  // Chosen once per platform, so the hook order never changes between renders.
+  Platform.OS === 'web' ? () => undefined : useOpenReportFromNotificationNative;
+
+function useOpenReportFromNotificationNative(enabled: boolean) {
   const last = Notifications.useLastNotificationResponse();
 
   useEffect(() => {
