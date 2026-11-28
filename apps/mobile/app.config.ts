@@ -8,8 +8,6 @@ import type { ConfigContext, ExpoConfig } from 'expo/config';
  * Adds secrets that can't live in app.json (which is committed). Set them in .env.local,
  * which Expo loads when building:
  *
- * - GOOGLE_MAPS_API_KEY: Maps SDK for Android key for the Map tab (react-native-maps).
- *   Without it the app still builds, but the map shows blank.
  * - GOOGLE_SERVICES_JSON (optional): path to google-services.json, e.g. an EAS file
  *   environment variable. Defaults to ./google-services.json (gitignored). Without the file
  *   the app still builds, but push notifications don't work (src/lib/notifications.ts).
@@ -28,7 +26,9 @@ export default ({ config, projectRoot }: ConfigContext): ExpoConfig => {
     },
     plugins: [
       ...(config.plugins ?? []),
-      ['react-native-maps', { androidGoogleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY ?? '' }],
+      // Maps (src/lib/mapbox.ts). The token is read at runtime from
+      // EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN; Mapbox no longer needs a secret download token.
+      '@rnmapbox/maps',
     ],
   };
 };

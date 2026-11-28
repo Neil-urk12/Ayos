@@ -5,7 +5,7 @@ export type PlacePreviewProps = {
   coordinate: { latitude: number; longitude: number } | null;
 };
 
-/** Web: react-native-maps doesn't run in the browser, so keep the drawn preview. */
+/** Web: the Mapbox native SDK doesn't run in the browser, so keep the drawn preview. */
 export function PlacePreview(_props: PlacePreviewProps) {
   return <PlaceDrawing />;
 }
